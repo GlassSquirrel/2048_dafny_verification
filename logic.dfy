@@ -32,6 +32,8 @@ predicate ValidValues(grid: Grid)
 */
 
 //(1) new_game()
+
+
 // First initialize a new board with all tiles being 0
 method new_game() returns (grid: Grid)
     // spec 5: board boundary
@@ -42,6 +44,7 @@ method new_game() returns (grid: Grid)
     var row := seq(N, _ => 0);
     grid := seq(N, _ => row);
 }
+
 
 // The above board will be passed to game.py to generate random 2s
 // Then we validate the random generation
@@ -213,6 +216,65 @@ method game_state(grid: Grid) returns (s: State)
 */
 
 // (3) move()
+// Spec 5: Board boundaries. N is fixed to 4.
+//extract non-zero elements
+function FilterNonZeros(s: seq<int>): seq<int>
+    ensures |FilterNonZeros(s)| <= |s|
+    ensures forall x :: x in FilterNonZeros(s) ==> x in s
+{
+    if |s| == 0 then []
+    else if s[0] != 0 then [s[0]] + FilterNonZeros(s[1..])
+    else FilterNonZeros(s[1..])
+}
+
+// Logic to shift non-zero tiles to the left and pad with zeros
+function CompressRow(row: seq<int>): (seq<int>, bool)
+    requires |row| == N
+    ensures |CompressRow(row).0| == N
+    ensures forall x :: x in CompressRow(row).0 ==> x == 0 || x in row
+{
+    var nonZeros := FilterNonZeros(row);
+    var padded := nonZeros + seq(N - |nonZeros|, _ => 0);
+    (padded, padded != row)
+}
+
+
+method move(mat: Grid) returns (new_mat: Grid, done: bool)
+    requires ValidGrid(mat)
+    requires ValidValues(mat)
+    
+    ensures ValidGrid(new_mat)
+    ensures ValidValues(new_mat)
+    ensures done == (new_mat != mat)
+{
+    var temp_grid: seq<seq<int>> := [];
+    done := false;
+    
+    for i := 0 to N 
+        invariant 0 <= i <= N
+        invariant |temp_grid| == i
+        invariant forall k :: 0 <= k < i ==> |temp_grid[k]| == N
+        invariant done == (temp_grid != mat[..i])
+        invariant forall k :: 0 <= k < i ==> 
+            forall j :: 0 <= j < N ==> temp_grid[k][j] == 0 || IsPowerOfTwo(temp_grid[k][j])
+    {
+        var res := CompressRow(mat[i]);
+        var row_res := res.0;
+        var row_changed := res.1;
+        
+        assert forall x :: x in mat[i] ==> x == 0 || IsPowerOfTwo(x);
+        
+        temp_grid := temp_grid + [row_res];
+        
+        if row_changed {
+            done := true;
+        }
+    }
+    
+    new_mat := temp_grid;
+    return new_mat, done;
+}
+
 
 // (4) merge() - merge the neighboring 2 tiles with same value
 // should satisfy spec 1, 2, 3, 5
@@ -333,18 +395,97 @@ method merge(grid: Grid, done_in: bool) returns (res: Grid, done: bool)
 /*
 3. matrix transformation
 */
+
 // (5) reverse()
+method reverse(mat: Grid) returns (res: Grid)
+    requires ValidGrid(mat)
+    requires ValidValues(mat)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+    ensures forall i, j :: 0 <= i < N && 0 <= j < N ==> res[i][j] == mat[i][N - 1 - j]
+{
+    res := seq(N, (i: int) => 
+        if 0 <= i < |mat| then 
+            seq(N, (j: int) => 
+                if 0 <= j < N then mat[i][N - 1 - j] else 0
+            )
+        else 
+            seq(N, _ => 0)
+    );
+}
+
+
 
 // (6) transpose
+method transpose(mat: Grid) returns (res: Grid)
+    requires ValidGrid(mat)
+    requires ValidValues(mat)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+    ensures forall i, j :: 0 <= i < N && 0 <= j < N ==> res[i][j] == mat[j][i]
+{
+    res := seq(N, (i: int) => 
+        seq(N, (j: int) => 
+            if 0 <= i < N && 0 <= j < N then mat[j][i] else 0
+        )
+    );
+}
 
 /* 
 4. directional controls
 */
 
 // (7) left()
+// method left(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1, d1 := move(game);
+//     var g2, d2 := merge(g1, d1);
+//     var g3, _ := move(g2);
+//     res := g3;
+//     done := d2;
+// }
 
-// (8) right()
+// // (8) right()
+// method right(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1 := reverse(game);
+//     var g2, d := left(g1);
+//     res := reverse(g2);
+//     done := d;
+// }
 
-// (9) up()
+// // (9) up()
+// method up(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1 := transpose(game);
+//     var g2, d := left(g1);
+//     res := transpose(g2);
+//     done := d;
+// }
 
-// (10) down()
+// // (10) down()
+// method down(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1 := transpose(game);
+//     var g2 := reverse(g1);
+//     var g3, d := left(g2);
+//     var g4 := reverse(g3);
+//     res := transpose(g4);
+//     done := d;
+// }
