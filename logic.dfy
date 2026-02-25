@@ -36,7 +36,20 @@ function CountInGrid(grid: Grid, value: int): int
 }
 
 // Predicate to check whether the random initialization of grid is valid or not
-predicate
+predicate IsValidInitialBoard(grid: Grid, n: int)
+{
+    n > 0 &&
+    |grid| == n &&
+    (forall i :: 0 <= i < n ==> |grid[i]| == n) &&
+    (forall i, j :: 0 <= i < n && 0 <= j < n ==> grid[i][j] == 0 || grid[i][j] == 2) &&
+    CountInGrid(grid, 2) == 2   // two 2 generated
+}
+
+method initial_grid_validation(matrix: Grid, n: int) returns (b: bool)
+    ensures b == IsValidInitialBoard(matrix, n)
+{
+    return IsValidInitialBoard(matrix, n);
+}
 
 
 //(2) game_state()
