@@ -225,123 +225,39 @@ method game_state(grid: Grid) returns (s: State)
 3. matrix transformation
 */
 
-// basic definitions
-const GRID: nat := 4
-
-type Board = array2<int>
-
-function Pow2(k:nat): int
-{
-  if k == 0 then 1
-  else 2 * Pow2(k-1)
-}
-
-predicate ValidTile(v:int)
-{
-  v == 0 || exists k:nat ::
-       0 <= k <= 11 && v == Pow2(k)
-}
-
-predicate ValidBoard(b:Board)
-  reads b
-{
-  b.Length0 == GRID &&
-  b.Length1 == GRID &&
-  forall i,j ::
-      0 <= i < GRID &&
-      0 <= j < GRID
-      ==> ValidTile(b[i,j])
-}
-
 // (5) reverse()
-method Reverse(b:Board) returns (r:Board)
-// spec 2 and 5
-  requires ValidBoard(b)
-  ensures ValidBoard(r)
-  ensures forall i,j ::
-      0 <= i < GRID &&
-      0 <= j < GRID
-      ==> r[i,j] == b[i, GRID-1-j]
+method reverse(mat: Grid) returns (res: Grid)
+    requires ValidGrid(mat)
+    requires ValidValues(mat)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+    ensures forall i, j :: 0 <= i < N && 0 <= j < N ==> res[i][j] == mat[i][N - 1 - j]
 {
-  r := new int[GRID, GRID];
-
-  var i := 0;
-  while i < GRID
-    invariant 0 <= i <= GRID
-    invariant forall x,y ::
-        0 <= x < i &&
-        0 <= y < GRID
-        ==> r[x,y] == b[x, GRID-1-y]
-   {
-    var j := 0;
-    while j < GRID
-      invariant 0 <= j <= GRID
-
-        //0---j-1 cols have been reversed correctly 
-      invariant forall y ::
-          0 <= y < j
-          ==> r[i,y] == b[i, GRID-1-y]
-
-        //0---i-1 have been reversed correctly 
-      invariant forall x,y ::
-          0 <= x < i &&
-          0 <= y < GRID
-          ==> r[x,y] == b[x, GRID-1-y]
-
-    {
-      r[i,j] := b[i, GRID-1-j];
-      j := j + 1;
-    }
-
-    i := i + 1;
-  }
+    res := seq(N, (i: int) => 
+        if 0 <= i < |mat| then 
+            seq(N, (j: int) => 
+                if 0 <= j < N then mat[i][N - 1 - j] else 0
+            )
+        else 
+            seq(N, _ => 0)
+    );
 }
+
 
 
 // (6) transpose
-method Transpose(b:Board) returns (t:Board)
-  requires ValidBoard(b)
-  ensures ValidBoard(t)
-  ensures forall i,j ::
-    0 <= i < GRID &&
-    0 <= j < GRID
-    ==> t[i,j] == b[j,i]
+method transpose(mat: Grid) returns (res: Grid)
+    requires ValidGrid(mat)
+    requires ValidValues(mat)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+    ensures forall i, j :: 0 <= i < N && 0 <= j < N ==> res[i][j] == mat[j][i]
 {
-  t := new int[GRID, GRID];
-
-  var i := 0;
-  while i < GRID
-    invariant 0 <= i <= GRID
-    //all rows finished is correct
-    invariant forall x,y ::
-        0 <= x < i &&
-        0 <= y < GRID
-        ==> t[x,y] == b[y,x]
-
-  {
-    var j := 0;
-    while j < GRID
-      invariant 0 <= j <= GRID
-
-      // current col has been transposed correctly
-      invariant forall y ::
-          0 <= y < j
-          ==> t[i,y] == b[y,i]
-
-      // previous cols have been transposed correctly
-      invariant forall x,y ::
-          0 <= x < i &&
-          0 <= y < GRID
-          ==> t[x,y] == b[y,x]
-
-    {
-      t[i,j] := b[j,i];
-
-      j := j + 1;
-    }
-
-    i := i + 1;
-  }
+    res := seq(N, (i: int) => 
+        seq(N, (j: int) => 
+            if 0 <= i < N && 0 <= j < N then mat[j][i] else 0
+        )
+    );
 }
 
 /* 
@@ -349,9 +265,56 @@ method Transpose(b:Board) returns (t:Board)
 */
 
 // (7) left()
+// method left(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1, d1 := move(game);
+//     var g2, d2 := merge(g1, d1);
+//     var g3, _ := move(g2);
+//     res := g3;
+//     done := d2;
+// }
 
-// (8) right()
+// // (8) right()
+// method right(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1 := reverse(game);
+//     var g2, d := left(g1);
+//     res := reverse(g2);
+//     done := d;
+// }
 
-// (9) up()
+// // (9) up()
+// method up(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1 := transpose(game);
+//     var g2, d := left(g1);
+//     res := transpose(g2);
+//     done := d;
+// }
 
-// (10) down()
+// // (10) down()
+// method down(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1 := transpose(game);
+//     var g2 := reverse(g1);
+//     var g3, d := left(g2);
+//     var g4 := reverse(g3);
+//     res := transpose(g4);
+//     done := d;
+// }
