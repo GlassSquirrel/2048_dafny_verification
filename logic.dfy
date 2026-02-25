@@ -56,10 +56,30 @@ predicate ValidGrid(grid: Grid)
     |grid| == N && forall i :: 0 <= i < N ==> |grid[i]| == N
 }
 
+// predicate IsPowerOfTwo(x: int)
+// {
+//     x == 2 || x == 4 || x == 8 || x == 16 || x == 32 ||
+//     x == 64 || x == 128 || x == 256 || x == 512 || x == 2048
+// }
+// better implementation of IsPowerOfTwo for 2048 (exclude 1)
+predicate IsPowerOfTwo(x: int)
+{
+    if x < 2 then false
+    else if x == 2 then true
+    else x % 2 == 0 && IsPowerOfTwo(x / 2)
+}
+
+predicate ValidValues(grid: Grid)
+    requires ValidGrid(grid)
+{
+    forall i, j :: 0 <= i < N && 0 <= j < N ==> grid[i][j] == 0 || IsPowerOfTwo(grid[i][j])
+}
+
 // Define 3 predicates to check for "has win" / "has lose" / "can continue"
 // predicate 1: has win (tile value reaches 2048)
 predicate HasWinTile(grid: Grid)
     requires ValidGrid(grid)
+    requires ValidValues(grid)
 {
     exists i, j :: 0 <= i < N && 0 <= j < N && grid[i][j] == 2048
 }
@@ -67,6 +87,7 @@ predicate HasWinTile(grid: Grid)
 // predicate 2: has tile value = 0 (can generate new 2)
 predicate HasEmptyTile(grid: Grid)
     requires ValidGrid(grid)
+    requires ValidValues(grid)
 {
     exists i, j :: 0 <= i < N && 0 <= j < N && grid[i][j] == 0
 }
@@ -74,6 +95,7 @@ predicate HasEmptyTile(grid: Grid)
 // predicate 3: has more room to merge
 predicate MoreToMerge(grid: Grid)
     requires ValidGrid(grid)
+    requires ValidValues(grid)
 {
     // rows
     (exists i, j :: 0 <= i < N && 0 <= j < N - 1 && grid[i][j] == grid[i][j+1]) ||
@@ -86,6 +108,8 @@ datatype State = Win | NotOver | Lose
 
 method game_state(grid: Grid) returns (s: State)
     requires ValidGrid(grid)
+    requires ValidValues(grid)
+    // spec 3: game state evaluation
     ensures HasWinTile(grid) ==> s == Win
     ensures !(HasWinTile(grid)) && (HasEmptyTile(grid) || MoreToMerge(grid)) ==> s == NotOver
     ensures !HasWinTile(grid) && !HasEmptyTile(grid) && !MoreToMerge(grid) ==> s == Lose
@@ -122,14 +146,17 @@ method game_state(grid: Grid) returns (s: State)
             invariant 0 <= j <= N
             invariant forall l :: 0 <= l < j ==> grid[i][l] != 0
         {
-            if grid[i][j] == 0 { return NotOver; }
+            if grid[i][j] == 0 
+            { 
+                return NotOver; 
+            }
             j := j + 1;
         }
         i := i + 1;
     }
 
-    // 3. 检查是否有可合并的邻居
-    // 检查水平相邻
+    // 3. check for mergable neighbors
+    // 3.1 check rows
     i := 0;
     while i < N
         invariant 0 <= i <= N
@@ -140,40 +167,44 @@ method game_state(grid: Grid) returns (s: State)
         var j := 0;
         while j < N - 1
             invariant 0 <= j <= N - 1
-            invariant forall k, l :: 0 <= k < i && 0 <= l < N - 1 ==> grid[k][l] != grid[k][l+1]
-            invariant forall l :: 0 <= l < j ==> grid[i][l] != grid[i][l+1]
+            invariant forall k, l :: 0 <= k < i && 0 <= l < N - 1 ==> grid[k][l] != grid[k][l+1]  // previous rows
+            invariant forall l :: 0 <= l < j ==> grid[i][l] != grid[i][l+1]  // current row
         {
-            if grid[i][j] == grid[i][j+1] { return NotOver; }
+            if grid[i][j] == grid[i][j+1] 
+            { 
+                return NotOver; 
+            }
             j := j + 1;
         }
         i := i + 1;
     }
 
-    // 检查垂直相邻
+    // 3.2 check columns
     i := 0;
     while i < N - 1
         invariant 0 <= i <= N - 1
         invariant !HasWinTile(grid)
         invariant !HasEmptyTile(grid)
-        // 保持水平检查结果不丢失
-        invariant forall k, l :: 0 <= k < N && 0 <= l < N - 1 ==> grid[k][l] != grid[k][l+1]
-        // 记录垂直检查进度
+        invariant forall k, l :: 0 <= k < N && 0 <= l < N - 1 ==> grid[k][l] != grid[k][l+1]   // checked for rows
         invariant forall k, l :: 0 <= k < i && 0 <= l < N ==> grid[k][l] != grid[k+1][l]
     {
         var j := 0;
         while j < N
             invariant 0 <= j <= N
             invariant forall k, l :: 0 <= k < N && 0 <= l < N - 1 ==> grid[k][l] != grid[k][l+1]
-            invariant forall k, l :: 0 <= k < i && 0 <= l < N ==> grid[k][l] != grid[k+1][l]
-            invariant forall l :: 0 <= l < j ==> grid[i][l] != grid[i+1][l]
+            invariant forall k, l :: 0 <= k < i && 0 <= l < N ==> grid[k][l] != grid[k+1][l]   // previous columns
+            invariant forall l :: 0 <= l < j ==> grid[i][l] != grid[i+1][l]   // current columns
         {
-            if grid[i][j] == grid[i+1][j] { return NotOver; }
+            if grid[i][j] == grid[i+1][j] 
+            { 
+                return NotOver; 
+            }
             j := j + 1;
         }
         i := i + 1;
     }
 
-    // 以上都不满足，则判定为输
+    // 4. Lose
     return Lose;
 }
 
