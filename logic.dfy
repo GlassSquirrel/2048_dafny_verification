@@ -330,7 +330,7 @@ method merge(grid: Grid, done_in: bool) returns (res: Grid, done: bool)
     ensures ValidValues(res)
     ensures done_in ==> done
     ensures !done ==> res == grid
-    // [pstcondition for once merged, will have empty tile and game state cannot be lose
+    // postcondition for once merged, will have empty tile and game state cannot be lose
     ensures (done && !done_in) ==> HasEmptyTile(res)
     ensures !IsLose(res)
 {
@@ -436,56 +436,56 @@ method transpose(mat: Grid) returns (res: Grid)
 */
 
 // (7) left()
-// method left(game: Grid) returns (res: Grid, done: bool)
-//     requires ValidGrid(game)
-//     requires ValidValues(game)
-//     ensures ValidGrid(res)
-//     ensures ValidValues(res)
-// {
-//     var g1, d1 := move(game);
-//     var g2, d2 := merge(g1, d1);
-//     var g3, _ := move(g2);
-//     res := g3;
-//     done := d2;
-// }
+method left(game: Grid) returns (res: Grid, done: bool)
+    requires ValidGrid(game)
+    requires ValidValues(game)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+{
+    var g1, d1 := move(game);
+    var g2, d2 := merge(g1, d1);
+    var g3, _ := move(g2);
+    res := g3;
+    done := d2;
+}
 
-// // (8) right()
-// method right(game: Grid) returns (res: Grid, done: bool)
-//     requires ValidGrid(game)
-//     requires ValidValues(game)
-//     ensures ValidGrid(res)
-//     ensures ValidValues(res)
-// {
-//     var g1 := reverse(game);
-//     var g2, d := left(g1);
-//     res := reverse(g2);
-//     done := d;
-// }
+// (8) right()
+method right(game: Grid) returns (res: Grid, done: bool)
+    requires ValidGrid(game)
+    requires ValidValues(game)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+{
+    var g1 := reverse(game);
+    var g2, d := left(g1);
+    res := reverse(g2);
+    done := d;
+}
 
-// // (9) up()
-// method up(game: Grid) returns (res: Grid, done: bool)
-//     requires ValidGrid(game)
-//     requires ValidValues(game)
-//     ensures ValidGrid(res)
-//     ensures ValidValues(res)
-// {
-//     var g1 := transpose(game);
-//     var g2, d := left(g1);
-//     res := transpose(g2);
-//     done := d;
-// }
+// (9) up()
+method up(game: Grid) returns (res: Grid, done: bool)
+    requires ValidGrid(game)
+    requires ValidValues(game)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+{
+    var g1 := transpose(game);
+    var g2, d := left(g1);
+    res := transpose(g2);
+    done := d;
+}
 
-// // (10) down()
-// method down(game: Grid) returns (res: Grid, done: bool)
-//     requires ValidGrid(game)
-//     requires ValidValues(game)
-//     ensures ValidGrid(res)
-//     ensures ValidValues(res)
-// {
-//     var g1 := transpose(game);
-//     var g2 := reverse(g1);
-//     var g3, d := left(g2);
-//     var g4 := reverse(g3);
-//     res := transpose(g4);
-//     done := d;
-// }
+// (10) down()
+method down(game: Grid) returns (res: Grid, done: bool)
+    requires ValidGrid(game)
+    requires ValidValues(game)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+{
+    var g1 := transpose(game);
+    var g2 := reverse(g1);
+    var g3, d := left(g2);
+    var g4 := reverse(g3);
+    res := transpose(g4);
+    done := d;
+}
