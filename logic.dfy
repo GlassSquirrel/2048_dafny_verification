@@ -7,7 +7,7 @@ const N: int := 4
 
 //(1) new_game()
 
-=======
+
 // First initialize a new board with all tiles being 0
 method new_game() returns (matrix: Grid)
     // spec 5: board boundary
@@ -19,7 +19,7 @@ method new_game() returns (matrix: Grid)
     var row := seq(N, _ => 0);
     matrix := seq(N, _ => row);
 }
->>>>>>> 87454f9d1f049a157f77ff37751f8cfa0454a848
+
 
 // The above board will be passed to game.py to generate random 2s
 // Then we validate the random generation
