@@ -216,6 +216,64 @@ method game_state(grid: Grid) returns (s: State)
 */
 
 // (3) move()
+// Spec 5: Board boundaries. N is fixed to 4.
+//extract non-zero elements
+function FilterNonZeros(s: seq<int>): seq<int>
+    ensures |FilterNonZeros(s)| <= |s|
+    ensures forall x :: x in FilterNonZeros(s) ==> x in s
+{
+    if |s| == 0 then []
+    else if s[0] != 0 then [s[0]] + FilterNonZeros(s[1..])
+    else FilterNonZeros(s[1..])
+}
+
+// Logic to shift non-zero tiles to the left and pad with zeros
+function CompressRow(row: seq<int>): (seq<int>, bool)
+    requires |row| == N
+    ensures |CompressRow(row).0| == N
+    ensures forall x :: x in CompressRow(row).0 ==> x == 0 || x in row
+{
+    var nonZeros := FilterNonZeros(row);
+    var padded := nonZeros + seq(N - |nonZeros|, _ => 0);
+    (padded, padded != row)
+}
+
+
+method move(mat: Grid) returns (new_mat: Grid, done: bool)
+    requires ValidGrid(mat)
+    requires ValidValues(mat)
+    
+    ensures ValidGrid(new_mat)
+    ensures ValidValues(new_mat)
+    ensures done == (new_mat != mat)
+{
+    var temp_grid: seq<seq<int>> := [];
+    done := false;
+    
+    for i := 0 to N 
+        invariant 0 <= i <= N
+        invariant |temp_grid| == i
+        invariant forall k :: 0 <= k < i ==> |temp_grid[k]| == N
+        invariant done == (temp_grid != mat[..i])
+        invariant forall k :: 0 <= k < i ==> 
+            forall j :: 0 <= j < N ==> temp_grid[k][j] == 0 || IsPowerOfTwo(temp_grid[k][j])
+    {
+        var res := CompressRow(mat[i]);
+        var row_res := res.0;
+        var row_changed := res.1;
+        
+        assert forall x :: x in mat[i] ==> x == 0 || IsPowerOfTwo(x);
+        
+        temp_grid := temp_grid + [row_res];
+        
+        if row_changed {
+            done := true;
+        }
+    }
+    
+    new_mat := temp_grid;
+    return new_mat, done;
+}
 
 
 // (4) merge()
