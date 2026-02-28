@@ -378,21 +378,60 @@ function CountNonZerosGrid(g: seq<seq<int>>): nat    // count the number of non-
 
 // 1. 证明计数函数具有可加性：Count(a + b) == Count(a) + Count(b)
 lemma LemmaCountAdditivity(a: seq<int>, b: seq<int>)
-    ensures CountNonZerosRow(a + b) == CountNonZerosRow(a) + CountNonZerosRow(b)
+    ensures CountNonZerosRow(a + b)
+          == CountNonZerosRow(a) + CountNonZerosRow(b)
+    decreases |a|
 {
     if |a| == 0 {
+        // a = []
         assert a + b == b;
+        assert CountNonZerosRow(a) == 0;
     } else {
+        // 递归假设
         LemmaCountAdditivity(a[1..], b);
+
+        // 结构等式
+        assert a == [a[0]] + a[1..];
+        assert a + b == [a[0]] + (a[1..] + b);
+
+        // 展开 Count
+        assert CountNonZerosRow(a)
+             == (if a[0] != 0 then 1 else 0)
+              + CountNonZerosRow(a[1..]);
+
+        assert CountNonZerosRow(a + b)
+             == (if a[0] != 0 then 1 else 0)
+              + CountNonZerosRow(a[1..] + b);
+
+        // 递归假设给你：
+        // Count(a[1..] + b)
+        // ==
+        // Count(a[1..]) + Count(b)
+
+        // SMT 现在可以拼起来
     }
 }
 
 // 2. 证明全为0的序列计数为0
 lemma LemmaCountZerosIsZero(k: nat)
     ensures CountNonZerosRow(seq(k, _ => 0)) == 0
+    decreases k
 {
-    if k > 0 {
+    if k == 0 {
+        assert seq(0, _ => 0) == [];
+    } else {
         LemmaCountZerosIsZero(k - 1);
+
+        // 结构等式
+        assert seq(k, _ => 0)
+             == [0] + seq(k - 1, _ => 0);
+
+        // 展开 Count
+        assert CountNonZerosRow(seq(k, _ => 0))
+             == (if 0 != 0 then 1 else 0)
+              + CountNonZerosRow(seq(k - 1, _ => 0));
+
+        // (if 0 != 0 then 1 else 0) == 0
     }
 }
 
@@ -400,10 +439,36 @@ lemma LemmaCountZerosIsZero(k: nat)
 lemma LemmaNonZerosCountIsLength(s: seq<int>)
     requires forall x :: x in s ==> x != 0
     ensures CountNonZerosRow(s) == |s|
+    decreases |s|
 {
     if |s| == 0 {
+        // Count([]) == 0 自动成立
     } else {
+
+        // 1️⃣ 先实例化量词
+        assert s[0] in s;
+        assert s[0] != 0;
+
+        // 2️⃣ 证明 slice 仍满足前提
+        assert forall x :: x in s[1..] ==> x != 0
+        by {
+            forall x | x in s[1..]
+            ensures x != 0
+            {
+                // slice 的元素一定属于原序列
+                assert x in s;
+            }
+        }
+
+        // 3️⃣ 递归
         LemmaNonZerosCountIsLength(s[1..]);
+
+        // 4️⃣ 展开 Count
+        assert CountNonZerosRow(s)
+             == 1 + CountNonZerosRow(s[1..]);
+
+        // 5️⃣ 展开长度
+        assert |s| == 1 + |s[1..]|;
     }
 }
 
@@ -424,15 +489,67 @@ function CompressRow(row: seq<int>): (seq<int>, bool)
     var zeroFill := seq(N - |nonZeros|, _ => 0);
     var padded := nonZeros + zeroFill;
     
-    // 证明 1: FilterNonZeros(row) 的非零计数等于 row 的非零计数
-    assert CountNonZerosRow(nonZeros) == |nonZeros|;
+    // --- 证明 1：原始行计数 == |nonZeros| ---
+    LemmaFilterPreservesCount(row); 
+    // 现在 Dafny 知道 Count(row) == Count(nonZeros)
+    
+    assert forall x :: x in nonZeros ==> x != 0 by {
+        // 调用 FilterNonZeros 的后置条件
+    }
+    LemmaNonZerosCountIsLength(nonZeros);
+    // 现在 Dafny 知道 Count(nonZeros) == |nonZeros|
+    
+    assert CountNonZerosRow(row) == |nonZeros|; // 传递性成立
 
-    // step 2: padding 0s, make sure the length of row is N
-    var padded := nonZeros + seq(N - |nonZeros|, _ => 0);
-    assert CountNonZerosRow(padded) == CountNonZerosRow(nonZeros) + CountNonZerosRow(seq(N - |nonZeros|, _ => 0));
-    assert CountNonZerosRow(seq(N - |nonZeros|, _ => 0)) == 0;
+    // --- 证明 2：Padded 行计数 == |nonZeros| ---
+    LemmaCountAdditivity(nonZeros, zeroFill);
+    LemmaCountZerosIsZero(N - |nonZeros|);
+    
+    assert CountNonZerosRow(padded) == CountNonZerosRow(nonZeros) + CountNonZerosRow(zeroFill);
+    assert CountNonZerosRow(padded) == |nonZeros| + 0;
+    
     (padded, padded != row)
 } 
+
+lemma CompressRowPreservesCount(row: seq<int>)
+    requires |row| == N
+    requires forall j :: 0 <= j < |row| ==> row[j] == 0 || IsPowerOfTwo(row[j])
+    ensures CountNonZerosRow(CompressRow(row).0) == CountNonZerosRow(row)
+{
+    var nonZeros := FilterNonZeros(row);
+    var zeroFill := seq(N - |nonZeros|, _ => 0);
+    var padded := nonZeros + zeroFill;
+
+    // 1. 证明 FilterNonZeros 结果中的计数等于其长度
+    assert forall x :: x in nonZeros ==> x != 0 by {
+        // 利用 FilterNonZeros 的后置条件
+    }
+    LemmaNonZerosCountIsLength(nonZeros);
+    assert CountNonZerosRow(nonZeros) == |nonZeros|;
+
+    // 2. 证明 padded 的计数
+    LemmaCountAdditivity(nonZeros, zeroFill);
+    LemmaCountZerosIsZero(N - |nonZeros|);
+    assert CountNonZerosRow(padded) == CountNonZerosRow(nonZeros) + 0;
+    assert CountNonZerosRow(padded) == |nonZeros|;
+
+    // 3. 证明原始 row 的计数等于 |nonZeros|
+    // 你需要一个 Lemma 来连接 row 和 FilterNonZeros 的计数
+    LemmaFilterPreservesCount(row);
+    assert CountNonZerosRow(row) == |nonZeros|;
+}
+
+// 辅助 Lemma：FilterNonZeros 不改变非零计数
+lemma LemmaFilterPreservesCount(s: seq<int>)
+    ensures CountNonZerosRow(s) == CountNonZerosRow(FilterNonZeros(s))
+{
+    if |s| == 0 {
+    } else if s[0] == 0 {
+        LemmaFilterPreservesCount(s[1..]);
+    } else {
+        LemmaFilterPreservesCount(s[1..]);
+    }
+}
 
 // We also develop serveral lemmas based on CompressRow
 // Lemma 1: CompressRowLastElementIs0, shows that if we successfully compress a row, then the last element of it should be 0
@@ -496,6 +613,69 @@ lemma CompressRowPreservesWin(row: seq<int>)
     }
 }
 
+lemma LemmaCountGridAppend(temp: seq<seq<int>>, row: seq<int>)
+    ensures CountNonZerosGrid(temp + [row]) == CountNonZerosGrid(temp) + CountNonZerosRow(row)
+    // decreases |temp|
+{
+    if temp == [] {
+        // temp + [row] == [row]
+        assert temp + [row] == [row];
+        assert CountNonZerosGrid([row]) 
+               == CountNonZerosRow(row);
+    } else {
+        // 递归
+        LemmaCountGridAppend(temp[1..], row);
+
+        // 关键结构等式
+        assert temp == [temp[0]] + temp[1..];
+        assert temp + [row]
+               == [temp[0]] + (temp[1..] + [row]);
+
+        // 展开定义
+        assert CountNonZerosGrid(temp)
+             == CountNonZerosRow(temp[0])
+              + CountNonZerosGrid(temp[1..]);
+
+        assert CountNonZerosGrid(temp + [row])
+             == CountNonZerosRow(temp[0])
+              + CountNonZerosGrid(temp[1..] + [row]);
+
+        // 现在 Dafny 可以利用递归假设
+    }
+}
+
+lemma LemmaSeqsDifferAt<T>(s1: seq<T>, s2: seq<T>, k: int)
+    requires 0 <= k < |s1| && 0 <= k < |s2|
+    requires s1[k] != s2[k]
+    ensures s1 != s2
+{
+    // Dafny 的序列相等定义是：s1 == s2 <==> |s1| == |s2| && forall i :: s1[i] == s2[i]
+    // 当我们提供了一个 k 使得 s1[k] != s2[k]，逻辑上就直接否定了序列相等
+}
+
+lemma LemmaGridEqualityAfterAppend(g1: seq<seq<int>>, g2: seq<seq<int>>, row1: seq<int>, row2: seq<int>)
+    requires CountNonZerosGrid(g1) == CountNonZerosGrid(g2)
+    requires CountNonZerosRow(row1) == CountNonZerosRow(row2)
+    ensures CountNonZerosGrid(g1 + [row1]) == CountNonZerosGrid(g2 + [row2])
+{
+    // 利用之前定义的 LemmaCountGridAppend
+    LemmaCountGridAppend(g1, row1);
+    LemmaCountGridAppend(g2, row2);
+    
+    // Dafny 现在可以通过加法等式自动推导：
+    // Count(g1 + [row1]) = Count(g1) + Count(row1)
+    // Count(g2 + [row2]) = Count(g2) + Count(row2)
+    // 因为等式右边对应项相等，左边必然相等
+    assert CountNonZerosGrid(g1 + [row1]) 
+           == CountNonZerosGrid(g1) + CountNonZerosRow(row1);
+
+    assert CountNonZerosGrid(g2 + [row2]) 
+           == CountNonZerosGrid(g2) + CountNonZerosRow(row2);
+
+    assert CountNonZerosGrid(g1) + CountNonZerosRow(row1)
+         == CountNonZerosGrid(g2) + CountNonZerosRow(row2);
+}
+
 // Third, we define the move method itself
 // note: the move() method should accept Win state, since merging could create 2048
 method move(mat: Grid) returns (new_mat: Grid, done: bool)
@@ -518,7 +698,7 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
     ensures done == (new_mat != mat)
     // 4. every row preserve the same element and non-zero element remain in same order
     ensures forall i :: 0 <= i < N ==> FilterNonZeros(new_mat[i]) == FilterNonZeros(mat[i])
-    // ensures CountNonZerosGrid(new_mat) == CountNonZerosGrid(mat)
+    ensures CountNonZerosGrid(new_mat) == CountNonZerosGrid(mat)
 {
     var temp_grid: seq<seq<int>> := [];
     done := false;
@@ -540,7 +720,7 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
         invariant done ==> temp_grid != mat[..i]    // if previous rows moved, not the same
         // postcondition part 4:
         invariant forall k :: 0 <= k < i ==> FilterNonZeros(temp_grid[k]) == FilterNonZeros(mat[k])   // preseve the relative order of non-zero elements
-        // invariant CountNonZerosGrid(temp_grid) == CountNonZerosGrid(mat[..i])
+        invariant CountNonZerosGrid(temp_grid) == CountNonZerosGrid(mat[..i])
     {
         // 1. compress the row
         var res := CompressRow(mat[i]);
@@ -559,14 +739,30 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
         }
 
         // 3. update grid
-        var old_temp := temp_grid[..i];   // old_temp: before adding the new row
-        temp_grid := temp_grid + [row_res];
+        assert CountNonZerosGrid(temp_grid) == CountNonZerosGrid(mat[..i]);
 
+        // var old_temp := temp_grid[..i];   // old_temp: before adding the new row
+        // temp_grid := temp_grid + [row_res];
+
+        var old_temp := temp_grid;
+assert CountNonZerosGrid(old_temp) == CountNonZerosGrid(mat[..i]);
+
+assert CountNonZerosRow(row_res) == CountNonZerosRow(mat[i]);
+
+temp_grid := temp_grid + [row_res];
+
+LemmaGridEqualityAfterAppend(old_temp, mat[..i], row_res, mat[i]);
+assert mat[..i+1] == mat[..i] + [mat[i]];
+
+assert CountNonZerosGrid(temp_grid) 
+       == CountNonZerosGrid(mat[..i+1]);
         // proof for !IsLose
         if done {
             if row_changed {
                 assert temp_grid[i] == row_res;
                 assert temp_grid[i] != mat[i];
+                assert temp_grid[i] != mat[..i+1][i];
+                LemmaSeqsDifferAt(temp_grid, mat[..i+1], i);
                 assert temp_grid != mat[..i+1];
             } else {
                 var k :| 0 <= k < i && temp_grid[k] != mat[k];
@@ -578,6 +774,12 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
     }
 
     new_mat := temp_grid;
+    LemmaFullSlice(mat);
+assert mat[..N] == mat;
+assert CountNonZerosGrid(mat[..N]) == CountNonZerosGrid(mat);
+
+assert CountNonZerosGrid(new_mat)
+       == CountNonZerosGrid(mat);
 
     if !done {
         // no changes
@@ -593,6 +795,11 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
     assert !IsLose(mat) ==> !IsLose(new_mat);
 
     return new_mat, done;
+}
+
+lemma LemmaFullSlice<T>(s: seq<T>)
+    ensures s[..|s|] == s
+{
 }
 
 /**********
@@ -798,6 +1005,98 @@ method transpose(mat: Grid) returns (res: Grid)
 */
 // The game.py should guarantee that a new tile will be generated, if any of the direction function return done = True
 // (7) left()
+lemma LemmaDoneImpliesResultChanged(
+    game: Grid,
+    g1: Grid, g2: Grid, g3: Grid,
+    d1: bool, d2: bool, d3: bool)
+    requires !d1 ==> g1 == game
+    requires !d2 ==> g2 == g1
+    requires !d3 ==> g3 == g2
+
+    requires d1 ==> g1 != game
+    requires d2 ==> g2 != g1
+    requires d3 ==> g3 != g2
+
+    requires d1 || d2 || d3
+    ensures g3 != game
+{
+    if g3 == game {
+
+        // 先推出 g2 == game
+        assert g3 == game;
+        assert g3 == g2 || d3; // 通过 case 分析更稳
+
+        // 更简单的做法：直接反证展开
+
+        // if !d3 {
+        //     assert g3 == g2; // 根据 requires !d3 ==> g3 == g2
+        //     assert g2 == game;
+        // } else {
+        //     // 如果 d3 为 true，我们有 d3 ==> g3 != g2
+        //     // 但 g3 == game 且 g2 == game (如果前面成立)，这会导致矛盾
+        //     assert g3 != g2; 
+        // }
+
+        // if !d3 && !d2 && !d1 {
+        //      assert g3 == g2;
+        //      assert g2 == g1;
+        //      assert g1 == game;
+        //      assert g3 == game;
+        // }
+
+        if d3 {
+            // 如果 d3 为真，那么 g3 != g2
+            // 我们还需要 g2 == game 才能得到矛盾
+            // 这需要你证明：如果 d3 为真，且 d2/d1 为假，g2 必须是 game
+            if !d2 && !d1 {
+                assert g2 == g1;
+                assert g1 == game;
+                assert g2 == game;
+                assert g3 != g2; // 矛盾：g3(game) != g2(game)
+                assert false;
+            }
+            if !d2 && d1 {
+                assert g1 != game;
+                assert g1 == g2;
+                
+            }
+        }
+
+        if d2 {
+            // 如果 d2 为真，那么 g2 != g1
+            // 只要我们能证明在当前假设 g3 == game 的情况下，g2 == g1，就产生矛盾
+            if !d3 && !d1 {
+                assert !d3 ==> g3 == g2; // 前提
+                assert !d1 ==> g1 == game; // 前提
+                assert g3 == g2;
+                assert g2 == game; // 因为假设 g3 == game
+                assert g1 == game; // 因为 g1 == game
+                assert g2 == g1;   // 因为 g2 == game && g1 == game
+                assert g2 != g1;   // 因为 d2
+                assert false;      // 矛盾产生
+            }
+        }
+
+        if d1 {
+            // 如果 d1 为真，那么 g1 != game
+            // 我们只需要证明在假设 g3 == game 的情况下，g1 必然等于 game
+            if !d3 && !d2 {
+                assert !d3 ==> g3 == g2;
+                assert !d2 ==> g2 == g1;
+                assert g3 == g2;
+                assert g2 == g1;
+                assert g3 == g1;
+                assert g1 == game; // 因为假设 g3 == game
+                assert g1 != game; // 因为 d1
+                assert false;      // 矛盾产生
+            }
+        }
+
+        // 如果走到这里，说明 d1 d2 d3 全 false
+        assert !d1 && !d2 && !d3;
+        assert false;  // 与 requires d1 || d2 || d3 矛盾
+    }
+}
 
 method left(game: Grid) returns (res: Grid, done: bool)
     requires ValidGrid(game)
@@ -815,7 +1114,9 @@ method left(game: Grid) returns (res: Grid, done: bool)
     var g1, d1 := move(game);
     if !d1 { 
         assert g1 == game; 
-    } 
+    } else {
+        assert g1 != game;
+    }
     assert CountNonZerosGrid(g1) == CountNonZerosGrid(game);
     
     
@@ -824,18 +1125,22 @@ method left(game: Grid) returns (res: Grid, done: bool)
         assert g2 == g1;
         assert CountNonZerosGrid(g2) == CountNonZerosGrid(g1);
     } else {
+        assert g1 != g2;
         assert CountNonZerosGrid(g2) < CountNonZerosGrid(g1);
     }
 
     var g3, d3 := move(g2);
     if !d3 { 
         assert g3 == g2; 
-    } 
+    } else {
+        assert g3 != g2;
+    }
     assert CountNonZerosGrid(g3) == CountNonZerosGrid(g2);
 
     res := g3;
     done := d1 || d2 || d3;
     if !done {
+        assert d1 == false && d2 == false && d3 == false;
         assert g1 == game;
         assert g2 == g1;
         assert g3 == g2;
@@ -844,10 +1149,24 @@ method left(game: Grid) returns (res: Grid, done: bool)
 
     if done {
         // proof: g3 <= g2 <= g1 <= game
+        assert d1 || d2 || d3;
+
+        LemmaDoneImpliesResultChanged(game, g1, g2, g3, d1, d2, d3);
         assert CountNonZerosGrid(g3) == CountNonZerosGrid(g2); // move does not change the number of non-zeros
         assert CountNonZerosGrid(g2) <= CountNonZerosGrid(g1); // merge may change the number 
         assert CountNonZerosGrid(g1) == CountNonZerosGrid(game); // move does not change the number
         assert CountNonZerosGrid(g3) <= CountNonZerosGrid(game);
+        if d1 { 
+            assert g1 != game;
+            if !d2 {
+                assert g2 == g1;
+                if !d3 {
+                    assert g3 == g2;
+                    assert g3 != game; // 矛盾链：g3!=g2, g2==g1, g1!=game
+                }
+            }
+        }
+
     }
 }
 
