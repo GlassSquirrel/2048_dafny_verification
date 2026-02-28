@@ -745,17 +745,16 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
         // temp_grid := temp_grid + [row_res];
 
         var old_temp := temp_grid;
-assert CountNonZerosGrid(old_temp) == CountNonZerosGrid(mat[..i]);
+        assert CountNonZerosGrid(old_temp) == CountNonZerosGrid(mat[..i]);
 
-assert CountNonZerosRow(row_res) == CountNonZerosRow(mat[i]);
+        assert CountNonZerosRow(row_res) == CountNonZerosRow(mat[i]);
 
-temp_grid := temp_grid + [row_res];
+        temp_grid := temp_grid + [row_res];
 
-LemmaGridEqualityAfterAppend(old_temp, mat[..i], row_res, mat[i]);
-assert mat[..i+1] == mat[..i] + [mat[i]];
+        LemmaGridEqualityAfterAppend(old_temp, mat[..i], row_res, mat[i]);
+        assert mat[..i+1] == mat[..i] + [mat[i]];
 
-assert CountNonZerosGrid(temp_grid) 
-       == CountNonZerosGrid(mat[..i+1]);
+        assert CountNonZerosGrid(temp_grid) == CountNonZerosGrid(mat[..i+1]);
         // proof for !IsLose
         if done {
             if row_changed {
@@ -775,11 +774,10 @@ assert CountNonZerosGrid(temp_grid)
 
     new_mat := temp_grid;
     LemmaFullSlice(mat);
-assert mat[..N] == mat;
-assert CountNonZerosGrid(mat[..N]) == CountNonZerosGrid(mat);
+    assert mat[..N] == mat;
+    assert CountNonZerosGrid(mat[..N]) == CountNonZerosGrid(mat);
 
-assert CountNonZerosGrid(new_mat)
-       == CountNonZerosGrid(mat);
+    assert CountNonZerosGrid(new_mat) == CountNonZerosGrid(mat);
 
     if !done {
         // no changes
@@ -1017,14 +1015,13 @@ predicate HasMergeableRow(row: seq<int>) {
     exists j :: 0 <= j < N - 1 && row[j] != 0 && row[j] == row[j+1]
 }
 
-lemma LemmaMergeBlockedImpliesMoveBlocked(g2: Grid, g3: Grid, d2: bool, d3: bool) 
+lemma NoMergeNoLatterMoveDone(g2: Grid, g3: Grid, d2: bool, d3: bool) 
     ensures !d2 ==> !d3
 {
     assume !d2 ==> !d3;
 }
 
-// 这里要分类讨论d1, d2, d3的情况（共8种）说明都不可能，所以g3 != game
-lemma LemmaDoneImpliesResultChanged(
+lemma DoneImpliesResultChanged(
     game: Grid,
     g1: Grid, g2: Grid, g3: Grid,
     d1: bool, d2: bool, d3: bool)
@@ -1040,69 +1037,75 @@ lemma LemmaDoneImpliesResultChanged(
     ensures g3 != game
 {
     if g3 == game {
-
-        // 先推出 g2 == game
-        assert g3 == game;
-        assert g3 == g2 || d3; // 通过 case 分析更稳
-
+        // 1. move, merge, move
         if d1 && d2 && d3{
-
+            assert g1 != game;
+            assert g2 != g1;
+            assert g2 != game;
+            assert g2 != g3;
+            assert g3 != game;
         }
-        
+        // 2. no move, merge, move
         if !d1 && d2 && d3{
-
+            assert g1 == game;
+            assert g2 != g1;
+            assert g2 != game;
+            assert g3 != g2;
+            assert g3 != game;
         }
 
-        if d1 && !d2 && d3{
-            LemmaMergeBlockedImpliesMoveBlocked(g2, g3, d2, d3);
+        // 3. move，no merge，move
+        if d1 && !d2 && d3{ 
+            NoMergeNoLatterMoveDone(g2, g3, d2, d3);   // show it's impossible: no merge, but move again
             assert !d3;
             assert false;
         }
 
+        // move, merge, no move
         if d1 && d2 && !d3{
+            assert g1 != game;
+            assert g2!= g1;
+            assert g2 != game;
+            assert g2 == g3;
+            assert g3 != game;
         }
-
+        
+        // 5. no move, no merge, move
         if !d1 && !d2 && d3{
             assert g2 == g1;
             assert g1 == game;
             assert g2 == game;
-            assert g3 != g2; // 矛盾：g3(game) != g2(game)
+            assert g3 != g2;
             assert false;
         }
 
-        // 6. 
+        // 6. move, no merge, no move
         if d1 && !d2 && !d3{
             assert !d3 ==> g3 == g2;
             assert !d2 ==> g2 == g1;
             assert g3 == g2;
             assert g2 == g1;
             assert g3 == g1;
-            assert g1 == game; // 因为假设 g3 == game
-            assert g1 != game; // 因为 d1
-            assert false;      // 矛盾产生
+            assert g1 == game;
+            assert g1 != game;
+            assert false;
         }
 
-        // 7. 没move，但merge，没move，ok
+        // 7. no move, no merge, no move
         if !d1 && d2 && !d3{
-            assert !d3 ==> g3 == g2; // 前提
-            assert !d1 ==> g1 == game; // 前提
+            assert !d3 ==> g3 == g2;
+            assert !d1 ==> g1 == game;
             assert g3 == g2;
-            assert g2 == game; // 因为假设 g3 == game
-            assert g1 == game; // 因为 g1 == game
-            assert g2 == g1;   // 因为 g2 == game && g1 == game
-            assert g2 != g1;   // 因为 d2
-            assert false;      // 矛盾产生
+            assert g2 == game;
+            assert g1 == game;
+            assert g2 == g1;
+            assert g2 != g1;
+            assert false;
         }
 
-        // 8. ok
-        // if !d1 && !d2 && !d3{
-        //     assert d1 || d2 || d3;
-        //     assert false;
-        // }
-
-        // 如果走到这里，说明 d1 d2 d3 全 false
+        // last chance:
         assert !d1 && !d2 && !d3;
-        assert false;  // 与 requires d1 || d2 || d3 矛盾
+        assert false;    // contradict requires d1 || d2 || d3
     }
 }
 
@@ -1160,7 +1163,7 @@ method left(game: Grid) returns (res: Grid, done: bool)
         // proof: g3 <= g2 <= g1 <= game
         assert d1 || d2 || d3;
 
-        LemmaDoneImpliesResultChanged(game, g1, g2, g3, d1, d2, d3);
+        DoneImpliesResultChanged(game, g1, g2, g3, d1, d2, d3);
         assert CountNonZerosGrid(g3) == CountNonZerosGrid(g2); // move does not change the number of non-zeros
         assert CountNonZerosGrid(g2) <= CountNonZerosGrid(g1); // merge may change the number 
         assert CountNonZerosGrid(g1) == CountNonZerosGrid(game); // move does not change the number
@@ -1171,7 +1174,7 @@ method left(game: Grid) returns (res: Grid, done: bool)
                 assert g2 == g1;
                 if !d3 {
                     assert g3 == g2;
-                    assert g3 != game; // 矛盾链：g3!=g2, g2==g1, g1!=game
+                    assert g3 != game;       // g3!=g2, g2==g1, g1!=game
                 }
             }
         }
