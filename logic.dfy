@@ -1045,53 +1045,60 @@ lemma LemmaDoneImpliesResultChanged(
         assert g3 == game;
         assert g3 == g2 || d3; // 通过 case 分析更稳
 
-        if d3 && !d2 && !d1 {
-                assert g2 == g1;
-                assert g1 == game;
-                assert g2 == game;
-                assert g3 != g2; // 矛盾：g3(game) != g2(game)
-                assert false;
+        if d1 && d2 && d3{
+
         }
         
-        if d3 && !d2 && d1 {
+        if !d1 && d2 && d3{
+
+        }
+
+        if d1 && !d2 && d3{
             LemmaMergeBlockedImpliesMoveBlocked(g2, g3, d2, d3);
             assert !d3;
             assert false;
         }
 
-        if d2 {
-            // 如果 d2 为真，那么 g2 != g1
-            // 只要我们能证明在当前假设 g3 == game 的情况下，g2 == g1，就产生矛盾
-            if !d3 && !d1 {
-                assert !d3 ==> g3 == g2; // 前提
-                assert !d1 ==> g1 == game; // 前提
-                assert g3 == g2;
-                assert g2 == game; // 因为假设 g3 == game
-                assert g1 == game; // 因为 g1 == game
-                assert g2 == g1;   // 因为 g2 == game && g1 == game
-                assert g2 != g1;   // 因为 d2
-                assert false;      // 矛盾产生
-            } else if !d3 && d1 {
-                assert g1 != game;
-                assert g1 != g2;
-                assert g2 == g3;
-            }
+        if d1 && d2 && !d3{
         }
 
-        if d1 {
-            // 如果 d1 为真，那么 g1 != game
-            // 我们只需要证明在假设 g3 == game 的情况下，g1 必然等于 game
-            if !d3 && !d2 {
-                assert !d3 ==> g3 == g2;
-                assert !d2 ==> g2 == g1;
-                assert g3 == g2;
-                assert g2 == g1;
-                assert g3 == g1;
-                assert g1 == game; // 因为假设 g3 == game
-                assert g1 != game; // 因为 d1
-                assert false;      // 矛盾产生
-            }
+        if !d1 && !d2 && d3{
+            assert g2 == g1;
+            assert g1 == game;
+            assert g2 == game;
+            assert g3 != g2; // 矛盾：g3(game) != g2(game)
+            assert false;
         }
+
+        // 6. 
+        if d1 && !d2 && !d3{
+            assert !d3 ==> g3 == g2;
+            assert !d2 ==> g2 == g1;
+            assert g3 == g2;
+            assert g2 == g1;
+            assert g3 == g1;
+            assert g1 == game; // 因为假设 g3 == game
+            assert g1 != game; // 因为 d1
+            assert false;      // 矛盾产生
+        }
+
+        // 7. 没move，但merge，没move，ok
+        if !d1 && d2 && !d3{
+            assert !d3 ==> g3 == g2; // 前提
+            assert !d1 ==> g1 == game; // 前提
+            assert g3 == g2;
+            assert g2 == game; // 因为假设 g3 == game
+            assert g1 == game; // 因为 g1 == game
+            assert g2 == g1;   // 因为 g2 == game && g1 == game
+            assert g2 != g1;   // 因为 d2
+            assert false;      // 矛盾产生
+        }
+
+        // 8. ok
+        // if !d1 && !d2 && !d3{
+        //     assert d1 || d2 || d3;
+        //     assert false;
+        // }
 
         // 如果走到这里，说明 d1 d2 d3 全 false
         assert !d1 && !d2 && !d3;
