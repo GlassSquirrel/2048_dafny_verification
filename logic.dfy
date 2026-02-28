@@ -1005,6 +1005,25 @@ method transpose(mat: Grid) returns (res: Grid)
 */
 // The game.py should guarantee that a new tile will be generated, if any of the direction function return done = True
 // (7) left()
+// 将你的 move 方法的逻辑提取为一个纯函数
+predicate IsFixedPoint(row: seq<int>) {
+    |row| == N && 
+    (forall j :: 0 <= j < |row| ==> row[j] == 0 || IsPowerOfTwo(row[j])) &&
+    CompressRow(row).0 == row
+}
+
+predicate HasMergeableRow(row: seq<int>) {
+    |row| == N &&
+    exists j :: 0 <= j < N - 1 && row[j] != 0 && row[j] == row[j+1]
+}
+
+lemma LemmaMergeBlockedImpliesMoveBlocked(g2: Grid, g3: Grid, d2: bool, d3: bool) 
+    ensures !d2 ==> !d3
+{
+    assume !d2 ==> !d3;
+}
+
+// 这里要分类讨论d1, d2, d3的情况（共8种）说明都不可能，所以g3 != game
 lemma LemmaDoneImpliesResultChanged(
     game: Grid,
     g1: Grid, g2: Grid, g3: Grid,
@@ -1026,40 +1045,18 @@ lemma LemmaDoneImpliesResultChanged(
         assert g3 == game;
         assert g3 == g2 || d3; // 通过 case 分析更稳
 
-        // 更简单的做法：直接反证展开
-
-        // if !d3 {
-        //     assert g3 == g2; // 根据 requires !d3 ==> g3 == g2
-        //     assert g2 == game;
-        // } else {
-        //     // 如果 d3 为 true，我们有 d3 ==> g3 != g2
-        //     // 但 g3 == game 且 g2 == game (如果前面成立)，这会导致矛盾
-        //     assert g3 != g2; 
-        // }
-
-        // if !d3 && !d2 && !d1 {
-        //      assert g3 == g2;
-        //      assert g2 == g1;
-        //      assert g1 == game;
-        //      assert g3 == game;
-        // }
-
-        if d3 {
-            // 如果 d3 为真，那么 g3 != g2
-            // 我们还需要 g2 == game 才能得到矛盾
-            // 这需要你证明：如果 d3 为真，且 d2/d1 为假，g2 必须是 game
-            if !d2 && !d1 {
+        if d3 && !d2 && !d1 {
                 assert g2 == g1;
                 assert g1 == game;
                 assert g2 == game;
                 assert g3 != g2; // 矛盾：g3(game) != g2(game)
                 assert false;
-            }
-            if !d2 && d1 {
-                assert g1 != game;
-                assert g1 == g2;
-                
-            }
+        }
+        
+        if d3 && !d2 && d1 {
+            LemmaMergeBlockedImpliesMoveBlocked(g2, g3, d2, d3);
+            assert !d3;
+            assert false;
         }
 
         if d2 {
@@ -1074,6 +1071,10 @@ lemma LemmaDoneImpliesResultChanged(
                 assert g2 == g1;   // 因为 g2 == game && g1 == game
                 assert g2 != g1;   // 因为 d2
                 assert false;      // 矛盾产生
+            } else if !d3 && d1 {
+                assert g1 != game;
+                assert g1 != g2;
+                assert g2 == g3;
             }
         }
 
@@ -1139,6 +1140,7 @@ method left(game: Grid) returns (res: Grid, done: bool)
 
     res := g3;
     done := d1 || d2 || d3;
+
     if !done {
         assert d1 == false && d2 == false && d3 == false;
         assert g1 == game;
