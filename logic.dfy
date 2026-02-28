@@ -363,6 +363,50 @@ lemma FilterLenLemma(s: seq<int>)
     }
 }
 
+// To achieve that, we first define two functions:
+function CountNonZerosRow(s: seq<int>): nat    // count the number of non-zero elements in a row
+{
+    if |s| == 0 then 0
+    else (if s[0] != 0 then 1 else 0) + CountNonZerosRow(s[1..])
+}
+
+function CountNonZerosGrid(g: seq<seq<int>>): nat    // count the number of non-zero elements in a row 
+{
+    if |g| == 0 then 0
+    else CountNonZerosRow(g[0]) + CountNonZerosGrid(g[1..])
+}
+
+// 1. 证明计数函数具有可加性：Count(a + b) == Count(a) + Count(b)
+lemma LemmaCountAdditivity(a: seq<int>, b: seq<int>)
+    ensures CountNonZerosRow(a + b) == CountNonZerosRow(a) + CountNonZerosRow(b)
+{
+    if |a| == 0 {
+        assert a + b == b;
+    } else {
+        LemmaCountAdditivity(a[1..], b);
+    }
+}
+
+// 2. 证明全为0的序列计数为0
+lemma LemmaCountZerosIsZero(k: nat)
+    ensures CountNonZerosRow(seq(k, _ => 0)) == 0
+{
+    if k > 0 {
+        LemmaCountZerosIsZero(k - 1);
+    }
+}
+
+// 3. 证明FilterNonZeros的结果计数等于其长度（因为它没有0）
+lemma LemmaNonZerosCountIsLength(s: seq<int>)
+    requires forall x :: x in s ==> x != 0
+    ensures CountNonZerosRow(s) == |s|
+{
+    if |s| == 0 {
+    } else {
+        LemmaNonZerosCountIsLength(s[1..]);
+    }
+}
+
 // CompressRow: input is a row, it gets all non-zero elements to the left, then pad 0s if there's room
 // output a bool indicating whether the row has changed or not
 function CompressRow(row: seq<int>): (seq<int>, bool)
@@ -373,11 +417,20 @@ function CompressRow(row: seq<int>): (seq<int>, bool)
     ensures forall x :: x in CompressRow(row).0 ==> x == 0 || IsPowerOfTwo(x)   // 2. spec 2: the values are valid
     ensures forall x :: x in CompressRow(row).0 ==> x == 0 || x in row   // 3. all the elements should come from the original row, no new elements generated
     // ensures CompressRow(row).1 ==> CompressRow(row).0[N-1] == 0   // if the row is changed, there must be at least one 0 at the end of row
+    ensures CountNonZerosRow(CompressRow(row).0) == CountNonZerosRow(row)
 {
     // step 1: filter out all non-zero elements
     var nonZeros := FilterNonZeros(row);
+    var zeroFill := seq(N - |nonZeros|, _ => 0);
+    var padded := nonZeros + zeroFill;
+    
+    // 证明 1: FilterNonZeros(row) 的非零计数等于 row 的非零计数
+    assert CountNonZerosRow(nonZeros) == |nonZeros|;
+
     // step 2: padding 0s, make sure the length of row is N
     var padded := nonZeros + seq(N - |nonZeros|, _ => 0);
+    assert CountNonZerosRow(padded) == CountNonZerosRow(nonZeros) + CountNonZerosRow(seq(N - |nonZeros|, _ => 0));
+    assert CountNonZerosRow(seq(N - |nonZeros|, _ => 0)) == 0;
     (padded, padded != row)
 } 
 
@@ -545,95 +598,25 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
 /**********
 (4) merge()
 ***********/
-// merge() merges the neighboring 2 tiles with same value, should satisfy spec 1, 2, 3, 5
-lemma LemmaCountUpdate(s: seq<int>, i: int, v: int)
+// merge() merges the neighboring 2 tiles with same value, should satisfy spec 1, 2, 5
+
+// After merging 2 tiles, the number of non-zero tiles should -1
+
+
+// We have the following lemma for the two CountNonZeros functions
+// Lemma 1: shows how to count non-zero tiles for a row
+lemma CountUpdate(s: seq<int>, i: int, v: int)
     requires 0 <= i < |s|
     ensures CountNonZerosRow(s[i := v]) == CountNonZerosRow(s) - (if s[i] != 0 then 1 else 0) + (if v != 0 then 1 else 0)
 {
-    // 这个引理通常通过对 s 的递归结构进行归纳证明
     if i == 0 {
-        // 基础情况：改的是第一个元素，递归部分 [1..] 没变
     } else {
-        // 归纳步：证明 s[1..] 的更新满足性质
-        LemmaCountUpdate(s[1..], i - 1, v);
+        CountUpdate(s[1..], i - 1, v);
     }
 }
 
-// spec 1: only merge tiles with same value, the first tile should be 2 * original value; second tile shoud be 0
-function merge_pair(row: seq<int>, j: int): (res: seq<int>)
-    requires 0 <= j < |row| - 1
-    // spec 1: only merge tiles with the same value
-    requires row[j] == row[j + 1] && row[j] != 0
-    requires IsPowerOfTwo(row[j])
-
-    ensures |res| == |row|
-    // spec 1: after merging, the first tile should be exactly double the original value;
-    // the second tile must be 0
-    ensures res[j] == row[j] * 2
-    ensures res[j+1] == 0
-    ensures IsPowerOfTwo(res[j])
-    // does not change other tiles
-    ensures forall k :: 0 <= k < |row| && k != j && k != j + 1 ==> res[k] == row[k]
-    ensures res[j] == 2048 ==> row[j] == 1024
-    ensures var r := merge_pair(row, j); 
-            r[j+1] == 0 && r[j] == row[j] * 2 // 必须确保 j+1 是 0
-    ensures res != row
-    ensures CountNonZerosRow(merge_pair(row, j)) == CountNonZerosRow(row) - 1
-{
-    // 定义中间步骤
-    var r1 := row[j := row[j] * 2];
-    var r2 := r1[j+1 := 0];
-    
-    // 在表达式块中调用引理进行证明
-    // 这里使用 calc 或是简单的 ghost 证明块
-    assert CountNonZerosRow(r2) == CountNonZerosRow(row) - 1 by {
-        // 步骤 1: 证明修改 j 位置后计数不变（非0变非0）
-        LemmaCountUpdate(row, j, row[j] * 2); 
-        // 步骤 2: 证明修改 j+1 位置后计数减1（非0变0）
-        LemmaCountUpdate(r1, j+1, 0);
-    }
-    
-    r2 // 最后一行必须是返回的表达式
-}
-
-// spec 1: every tile should only be merged once in one operation
-function update_count(counts: seq<int>, j: int): seq<int>
-    requires 0 <= j < |counts| - 1
-{
-    counts[j := counts[j] + 1][j + 1 := counts[j+1] + 1]
-}
-
-lemma LemmaRowDifferenceImpliesGridDifference(g1: Grid, g2: Grid, i: int)
-    requires ValidGrid(g1)
-    requires ValidGrid(g2)
-    requires 0 <= i < N
-    requires g1[i] != g2[i]
-    ensures g1 != g2
-{}
-
-lemma LemmaSeqsDifferAt(s1: seq<int>, s2: seq<int>, k: int)
-    requires 0 <= k < |s1| && 0 <= k < |s2|
-    requires s1[k] != s2[k]
-    ensures s1 != s2
-{
-    // 这个引理通常不需要 body，因为 Dafny 对 seq 相等的定义是：
-    // s1 == s2 <==> |s1| == |s2| && forall i :: 0 <= i < |s1| ==> s1[i] == s2[i]
-    // 只要提供了一个违反 forall 的反例 k，Dafny 就能推导出 s1 != s2。
-}
-
-function CountNonZerosRow(s: seq<int>): nat
-{
-    if |s| == 0 then 0
-    else (if s[0] != 0 then 1 else 0) + CountNonZerosRow(s[1..])
-}
-
-function CountNonZerosGrid(g: seq<seq<int>>): nat
-{
-    if |g| == 0 then 0
-    else CountNonZerosRow(g[0]) + CountNonZerosGrid(g[1..])
-}
-
-lemma LemmaGridCountUpdate(g: seq<seq<int>>, i: int, newRow: seq<int>)
+// Lemma 2: shows how to count non-zero tiles for a grid
+lemma GridCountUpdate(g: seq<seq<int>>, i: int, newRow: seq<int>)
     requires 0 <= i < |g|
     requires forall k :: 0 <= k < |g| ==> |g[k]| == (if k == i then |g[i]| else |g[k]|) // 确保结构存在
     requires |newRow| == |g[i]|
@@ -641,15 +624,51 @@ lemma LemmaGridCountUpdate(g: seq<seq<int>>, i: int, newRow: seq<int>)
             CountNonZerosGrid(g) - CountNonZerosRow(g[i]) + CountNonZerosRow(newRow)
 {
     if i == 0 {
-        // 第一行修改，CountNonZerosGrid(g) = CountRow(g[0]) + CountGrid(g[1..])
-        // 修改后为 CountRow(newRow) + CountGrid(g[1..])
-        // 差值正好是 CountRow(newRow) - CountRow(g[i])
     } else {
-        // 递归处理子序列
-        LemmaGridCountUpdate(g[1..], i - 1, newRow);
+        GridCountUpdate(g[1..], i - 1, newRow);
     }
 }
 
+// We then have a function merge_pair to do the merging given two tiles in a row
+// The merging should satisfy spec 1: only merge tiles with same value
+// the first tile value should be 2 * original value; second tile value shoud be 0
+// Other tiles should not be changed 
+function merge_pair(row: seq<int>, j: int): (res: seq<int>)
+    requires 0 <= j < |row| - 1
+    // spec 1: only merge tiles with the same value
+    requires row[j] == row[j + 1] && row[j] != 0
+    requires IsPowerOfTwo(row[j])
+
+    ensures |res| == |row|
+    ensures res[j] == row[j] * 2   // spec 1: after merging, the first tile should be exactly double the original value;
+    ensures res[j+1] == 0    // spec 1: the second tile must be 0
+    ensures IsPowerOfTwo(res[j])    // spec 2: valid value
+    ensures forall k :: 0 <= k < |row| && k != j && k != j + 1 ==> res[k] == row[k]    // does not change other tiles
+    ensures res[j] == 2048 ==> row[j] == 1024     // the generation of winning tile
+    ensures res != row
+    ensures CountNonZerosRow(merge_pair(row, j)) == CountNonZerosRow(row) - 1
+{
+    var r1 := row[j := row[j] * 2];
+    var r2 := r1[j+1 := 0];
+    
+    // proof for CountNonZerosRow(merge_pair(row, j)) == CountNonZerosRow(row) - 1
+    assert CountNonZerosRow(r2) == CountNonZerosRow(row) - 1 by {
+        CountUpdate(row, j, row[j] * 2); 
+        CountUpdate(r1, j+1, 0);
+    }
+    
+    r2 
+}
+
+// We also have a function to record hwo many merges happen to one tile
+// The function is used for the check of spec 1: every tile should only be merged once in one operation
+function update_count(counts: seq<int>, j: int): seq<int>
+    requires 0 <= j < |counts| - 1
+{
+    counts[j := counts[j] + 1][j + 1 := counts[j+1] + 1]
+}
+
+// The merge method should satisfy spec 1, 2, 5
 method merge(grid: Grid) returns (res: Grid, done: bool)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -657,13 +676,13 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
     requires !HasWinTile(grid)
     requires !IsLose(grid)
 
-    ensures ValidGrid(res)
-    ensures ValidValues(res)
-    ensures !done ==> res == grid
+    ensures ValidGrid(res)     // spec 5
+    ensures ValidValues(res)     // spec 2
+    ensures !done ==> res == grid   
     ensures done == (res != grid)
     ensures !done ==> CountNonZerosGrid(res) == CountNonZerosGrid(grid)
     ensures done ==> CountNonZerosGrid(res) < CountNonZerosGrid(grid)
-    // postcondition for once merged, will have empty tile and game state cannot be lose
+    // spec 1: once merged, will have empty tile and game state cannot be lose
     ensures done ==> HasEmptyTile(res)
     ensures !IsLose(res)
 {
@@ -693,11 +712,10 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
             invariant !done ==> res == grid
             invariant !done ==> res[i] == grid[i]
             invariant done <==> res != grid
-            // invariant !done ==> res[i] == grid[i]
             invariant |merged_counts| == N
             invariant forall k :: 0 <= k < N ==> 0 <= merged_counts[k] <= 1
             invariant forall k :: j <= k < N ==> merged_counts[k] == 0
-            invariant forall k :: i < k < N ==> res[k] == grid[k]  // later rows remain unsolved
+            invariant forall k :: i < k < N ==> res[k] == grid[k]   // later rows remain unsolved
             invariant forall k :: 0 <= k < N && k != i ==> res[k] == (if k < i then res[k] else grid[k])
             invariant done ==> HasEmptyTile(res)
             invariant !IsLose(res)
@@ -706,55 +724,27 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
         {
             if res[i][j] == res[i][j+1] && res[i][j] != 0 
             {
+                // record before merge
                 var count_before := CountNonZerosGrid(res);
                 var val_before_merge := res[i][j+1]; 
+                var old_res := res; 
                 if !done { assert res[i] == grid[i]; }
 
+                // merge the same pair
                 var updatedRow := merge_pair(res[i], j);
                 
-                
-                var old_res := res; // 在赋值前备份
+                // update the grid
                 res := res[i := updatedRow];
-                LemmaGridCountUpdate(old_res, i, updatedRow);
-                assert CountNonZerosGrid(res) == count_before - 1;
 
+                // show changes in grid
+                GridCountUpdate(old_res, i, updatedRow);
+                assert CountNonZerosGrid(res) == count_before - 1;
+                // proof for !IsLose
                 assert res[i][j+1] == 0;
                 ImpliesNotLose(res);
 
-                if !done {
-                    LemmaRowDifferenceImpliesGridDifference(res, grid, i);
-                } else {
-                    if res == grid {
-                        // 1. 这里的 :| (assign such that) 抓出了之前的差异行 k
-                        var k : int :| 0 <= k < N && old_res[k] != grid[k];
-                        
-                        if k != i {
-                            // 引导 A: 如果差异在其他行
-                            // 因为 res := res[i := updatedRow] 只改了第 i 行
-                            // 所以第 k 行在 res 里必须等于它在 old_res 里的样子
-                            assert res[k] == old_res[k]; 
-                            // 既然 res == grid，那么 res[k] 必须等于 grid[k]
-                            assert res[k] == grid[k]; 
-                            // 此时：grid[k] == res[k] == old_res[k] != grid[k] -> 产生矛盾
-                        } else {
-                            // 引导 B: 如果差异就在当前行 i
-                            // 我们需要证明 updatedRow 本身就不同于原始的 grid[i]
-                            // 利用合并产生 0 的特性
-                            assert res[i] == updatedRow;
-                            assert res[i][j+1] == 0;
-                            // 如果 grid[i][j+1] 不是 0，矛盾就产生了
-                            // 你可能需要一个辅助断言证明：一旦某处变 0，它就不会变回非 0
-                            if grid[i][j+1] != 0 {
-                                assert res[i][j+1] != grid[i][j+1];
-                            }
-                        }
-                        assert false; // 此时 Dafny 应该能看到所有路径都通往矛盾
-                    }
-                }
-
                 done := true; 
-
-                j := j + 2;
+                j := j + 2;   // skip the next merged grid
             }
             else { j := j + 1; }
         }
@@ -806,89 +796,60 @@ method transpose(mat: Grid) returns (res: Grid)
 /* 
 4. directional controls
 */
-
+// The game.py should guarantee that a new tile will be generated, if any of the direction function return done = True
 // (7) left()
+
 method left(game: Grid) returns (res: Grid, done: bool)
     requires ValidGrid(game)
     requires ValidValues(game)
     requires !HasWinTile(game)
     requires !IsLose(game)
+
     ensures ValidGrid(res)
     ensures ValidValues(res)
     ensures done == (res != game)
-    // ensures !HasWinTile(res)
-    ensures !IsLose(res)
+    ensures done ==> CountNonZerosGrid(res) <= CountNonZerosGrid(game)
+    ensures !done ==> res == game
+    ensures !IsLose(game)
 {
-// Step 1: 第一次压缩
     var g1, d1 := move(game);
+    if !d1 { 
+        assert g1 == game; 
+    } 
+    assert CountNonZerosGrid(g1) == CountNonZerosGrid(game);
     
-    // Step 2: 合并
-    // 注意：根据你的 merge 定义，它需要 !HasWinTile 的前提
-    // 如果 move 保证了不产生 2048，则满足前提
+    
     var g2, d2 := merge(g1);
-    
-    // Step 3: 第二次压缩（处理合并后产生的空位）
+    if !d2 { 
+        assert g2 == g1;
+        assert CountNonZerosGrid(g2) == CountNonZerosGrid(g1);
+    } else {
+        assert CountNonZerosGrid(g2) < CountNonZerosGrid(g1);
+    }
+
     var g3, d3 := move(g2);
+    if !d3 { 
+        assert g3 == g2; 
+    } 
+    assert CountNonZerosGrid(g3) == CountNonZerosGrid(g2);
 
     res := g3;
     done := d1 || d2 || d3;
-
-    // --- 证明部分 ---
-    
     if !done {
-        // 如果三个 done 都是 false，根据 move 和 merge 的 postcondition，
-        // g1 == game, g2 == g1, g3 == g2，自然推出 res == game
+        assert g1 == game;
+        assert g2 == g1;
+        assert g3 == g2;
         assert res == game;
-    } else {
-        // 如果 done 为 true，我们需要证明 res != game。
-        // 关键逻辑：2048 的操作是“单向”的。
-        // move 改变了位置，merge 减少了非零元素的数量。
-        
-        if d2 {
-            // 如果发生了合并，非零元素的总数一定会减少
-            // 利用你 merge 的 postcondition: CountNonZerosGrid(res) < CountNonZerosGrid(g1)
-            // 而 move 不改变非零元素数量：CountNonZerosGrid(g1) == CountNonZerosGrid(game)
-            // 所以 CountNonZerosGrid(res) < CountNonZerosGrid(game) => res != game
-            assert CountNonZerosGrid(g3) <= CountNonZerosGrid(g2);
-            assert CountNonZerosGrid(g2) < CountNonZerosGrid(g1);
-            assert CountNonZerosGrid(g1) == CountNonZerosGrid(game);
-            assert g3 != game;
-        } else if d1 {
-            // 如果没合并，但第一次 move 动了
-            // 此时 g2 == g1 (因为 !d2)，g3 可能等于 g2 也可能不等。
-            // 我们需要证明 move(game) 产生的 g1 如果不等于 game，
-            // 那么它是“更紧凑”的，且在没有 merge 的情况下，g3 依然保持这种“紧凑”性。
-            assert g2 == g1;
-            if !d3 {
-                assert g3 == g2;
-                assert g3 == g1;
-                assert g3 != game;
-            } else {
-                // 如果 d3 也发生了，通常需要证明 move 的幂等性或者
-                // 证明 move 不可能把矩阵“移回去”
-                assert g3 != g2; 
-                // 这里可能需要调用一个引理：如果 g1 = move(game) 且 g1 != game，
-                // 则不存在任何操作能让它回到 game，除非是非零元素数量变化。
-                // 但实际上 Dafny 往往能通过 FilterNonZeros 的 postcondition 自动识别：
-                // 因为 FilterNonZeros(g3[i]) == FilterNonZeros(game[i])
-                // 如果 g3 == game，则说明 move 没有改变任何东西，这与 d1 || d3 矛盾。
-                
-                if g3 == game {
-                   // 触发矛盾
-                   assert g3[0] == game[0];
-                }
-            }
-        } else if d3 {
-            // 同理，如果只有最后一次 move 动了
-            assert g1 == game;
-            assert g2 == g1;
-            assert g3 != g2; // from move's postcondition
-            assert g3 != game;
-        }
+    }
+
+    if done {
+        // proof: g3 <= g2 <= g1 <= game
+        assert CountNonZerosGrid(g3) == CountNonZerosGrid(g2); // move does not change the number of non-zeros
+        assert CountNonZerosGrid(g2) <= CountNonZerosGrid(g1); // merge may change the number 
+        assert CountNonZerosGrid(g1) == CountNonZerosGrid(game); // move does not change the number
+        assert CountNonZerosGrid(g3) <= CountNonZerosGrid(game);
     }
 }
-
-
 
 // // (8) right()
 // method right(game: Grid) returns (res: Grid, done: bool)
