@@ -121,13 +121,13 @@ module Init {
             invariant !HasWinTile(grid)
             invariant !HasEmptyTile(grid)
             invariant forall k, l :: 0 <= k < N && 0 <= l < N - 1 ==> grid[k][l] != grid[k][l+1]   // checked for rows
-            invariant forall k, l {:trigger grid[k][l]} :: 0 <= k < i && 0 <= l < N ==> grid[k][l] != grid[k+1][l]
+            invariant forall k, l {:trigger grid[k][l], grid[k+1][l]} :: 0 <= k < i && 0 <= l < N ==> grid[k][l] != grid[k+1][l]
         {
             var j := 0;
             while j < N
                 invariant 0 <= j <= N
                 invariant forall k, l :: 0 <= k < N && 0 <= l < N - 1 ==> grid[k][l] != grid[k][l+1]
-                invariant forall k, l {:trigger grid[k][l]} :: 0 <= k < i && 0 <= l < N ==> grid[k][l] != grid[k+1][l]   // previous columns
+                invariant forall k, l {:trigger grid[k][l], grid[k+1][l]} :: 0 <= k < i && 0 <= l < N ==> grid[k][l] != grid[k+1][l]   // previous columns
                 invariant forall l :: 0 <= l < j ==> grid[i][l] != grid[i+1][l]   // current columns
             {
                 if grid[i][j] == grid[i+1][j] 

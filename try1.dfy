@@ -33,7 +33,7 @@ lemma SeqElementsValidImpliesIndexValid(row: seq<int>)
 /*************************
  Predicates for Game State 
 **************************/
-// Define 3 predicates to check for "has win" / "has lose" / "can continue"
+// Define 4 predicates to check for "has win" / "is lose" / "can continue"
 // Predicate 1: has win (tile value reaches 2048)
 predicate HasWinTile(grid: Grid)
     requires ValidGrid(grid)
@@ -42,7 +42,7 @@ predicate HasWinTile(grid: Grid)
     exists i, j :: 0 <= i < N && 0 <= j < N && grid[i][j] == 2048
 }
 
-// {Predicate 2: has empty tile value = 0 (can generate new 2)
+// {Predicate 2: has empty tile value = 0 (can generate new 2)  =>  can continue
 predicate HasEmptyTile(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -50,7 +50,7 @@ predicate HasEmptyTile(grid: Grid)
     exists i, j :: 0 <= i < N && 0 <= j < N && grid[i][j] == 0
 }
 
-// Predicate 3: has more room to merge
+// Predicate 3: has more room to merge  =>  can continue
 predicate MoreToMerge(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -101,20 +101,21 @@ function CountNonZerosGrid(g: Grid): nat
     else CountNonZerosRow(g[0]) + CountNonZerosGrid(g[1..])
 }
 
-// count the frequency of value in a grid
+// count the number of elements with specific value in a row
 function CountInRow(row: seq<int>, value: int): int 
 {
     if |row| == 0 then 0
     else (if row[0] == value then 1 else 0) + CountInRow(row[1..], value)
 }
 
+// count the number of elements with specific value in a grid
 function CountInGrid(grid: Grid, value: int): int
 {
     if |grid| == 0 then 0
     else CountInRow(grid[0], value) + CountInGrid(grid[1..], value)
 }
 
-// lemmas based on above:
+// Lemmas based on above:
 // Lemma 1: Count(a + b) == Count(a) + Count(b)
 lemma CountRowAdditivity(a: seq<int>, b: seq<int>)
     ensures CountNonZerosRow(a + b) == CountNonZerosRow(a) + CountNonZerosRow(b)
@@ -1005,6 +1006,20 @@ if !HasWinTile(mat) {
     return new_mat, done;
 }
 
+// // a method to show that if two moves are in the same direction in a row, second done is false
+// method TwoMovesSameDirSecondNotDone(mat: Grid)
+// requires ValidGrid(mat)
+// requires ValidValues(mat)
+// requires !IsLose(mat)
+// {
+// var g1, d1 := move(mat);
+// assert WellPerformedGrid(g1);
+
+// var g2, d2 := move(g1);
+// assert !d2;
+// assert d2 == (g2 != g1);
+// assert g2 == g1;
+// }
 /**********
 (4) merge()
 ***********/
@@ -1371,7 +1386,7 @@ method left(game: Grid) returns (res: Grid, done: bool)
         // proof: g3 <= g2 <= g1 <= game
         assert ValidGrid(g1);
         assert ValidGrid(g2);
-        assert WellPerformedGrid(g1);            // 你已有，但这里再 assert 一次更稳
+        assert WellPerformedGrid(g1);
         assert WellPerformedGrid(g2) ==> !d3;
         assert d1 || d2 || d3;
 

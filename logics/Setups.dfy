@@ -34,7 +34,7 @@ module Setups {
     /*************************
     Predicates for Game State 
     **************************/
-    // Define 3 predicates to check for "has win" / "has lose" / "can continue"
+    // Define 4 predicates to check for "has win" / "is lose" / "can continue"
     // Predicate 1: has win (tile value reaches 2048)
     predicate HasWinTile(grid: Grid)
         requires ValidGrid(grid)
@@ -43,7 +43,7 @@ module Setups {
         exists i, j :: 0 <= i < N && 0 <= j < N && grid[i][j] == 2048
     }
 
-    // {Predicate 2: has empty tile value = 0 (can generate new 2)
+    // {Predicate 2: has empty tile value = 0 (can generate new 2)  =>  can continue
     predicate HasEmptyTile(grid: Grid)
         requires ValidGrid(grid)
         requires ValidValues(grid)
@@ -51,7 +51,7 @@ module Setups {
         exists i, j :: 0 <= i < N && 0 <= j < N && grid[i][j] == 0
     }
 
-    // Predicate 3: has more room to merge
+    // Predicate 3: has more room to merge  =>  can continue
     predicate MoreToMerge(grid: Grid)
         requires ValidGrid(grid)
         requires ValidValues(grid)
@@ -102,20 +102,21 @@ module Setups {
         else CountNonZerosRow(g[0]) + CountNonZerosGrid(g[1..])
     }
 
-    // count the frequency of value in a grid
+    // count the number of elements with specific value in a row
     function CountInRow(row: seq<int>, value: int): int 
     {
         if |row| == 0 then 0
         else (if row[0] == value then 1 else 0) + CountInRow(row[1..], value)
     }
 
+    // count the number of elements with specific value in a grid
     function CountInGrid(grid: Grid, value: int): int
     {
         if |grid| == 0 then 0
         else CountInRow(grid[0], value) + CountInGrid(grid[1..], value)
     }
 
-    // lemmas based on above:
+    // Lemmas based on above:
     // Lemma 1: Count(a + b) == Count(a) + Count(b)
     lemma CountRowAdditivity(a: seq<int>, b: seq<int>)
         ensures CountNonZerosRow(a + b) == CountNonZerosRow(a) + CountNonZerosRow(b)
@@ -174,7 +175,7 @@ module Setups {
         }
     }
 
-    // lemma 4:
+    // Lemma 4: CountNonZerosGrid additivity
     lemma CountGridAdditivity(temp: seq<seq<int>>, row: seq<int>)
         ensures CountNonZerosGrid(temp + [row]) == CountNonZerosGrid(temp) + CountNonZerosRow(row)
         // decreases |temp|
@@ -182,21 +183,17 @@ module Setups {
         if temp == [] {
             // temp + [row] == [row]
             assert temp + [row] == [row];
-            assert CountNonZerosGrid([row]) 
-                == CountNonZerosRow(row);
+            assert CountNonZerosGrid([row]) == CountNonZerosRow(row);
         } else {
             CountGridAdditivity(temp[1..], row);
-
             assert temp == [temp[0]] + temp[1..];
             assert temp + [row] == [temp[0]] + (temp[1..] + [row]);
-
             assert CountNonZerosGrid(temp) == CountNonZerosRow(temp[0]) + CountNonZerosGrid(temp[1..]);
-
             assert CountNonZerosGrid(temp + [row]) == CountNonZerosRow(temp[0]) + CountNonZerosGrid(temp[1..] + [row]);
         }
     }
 
-    // lemma 5
+    // Lemma 5: equal addition of CountGrid
     lemma GridEqualityAfterAppend(g1: seq<seq<int>>, g2: seq<seq<int>>, row1: seq<int>, row2: seq<int>)
         requires CountNonZerosGrid(g1) == CountNonZerosGrid(g2)
         requires CountNonZerosRow(row1) == CountNonZerosRow(row2)
@@ -212,31 +209,31 @@ module Setups {
         assert CountNonZerosGrid(g1) + CountNonZerosRow(row1) == CountNonZerosGrid(g2) + CountNonZerosRow(row2);
     }
 
-// for merge
-    // Lemma 1: shows how to count non-zero tiles for a row
-lemma CountUpdate(s: seq<int>, i: int, v: int)
-    requires 0 <= i < |s|
-    ensures CountNonZerosRow(s[i := v]) == CountNonZerosRow(s) - (if s[i] != 0 then 1 else 0) + (if v != 0 then 1 else 0)
-{
-    if i == 0 {
-    } else {
-        CountUpdate(s[1..], i - 1, v);
+    // For merge() use
+    // Lemma 6: shows how to count non-zero tiles for a row
+    lemma CountUpdate(s: seq<int>, i: int, v: int)
+        requires 0 <= i < |s|
+        ensures CountNonZerosRow(s[i := v]) == CountNonZerosRow(s) - (if s[i] != 0 then 1 else 0) + (if v != 0 then 1 else 0)
+    {
+        if i == 0 {
+        } else {
+            CountUpdate(s[1..], i - 1, v);
+        }
     }
-}
 
-// Lemma 2: shows how to count non-zero tiles for a grid
-lemma GridCountUpdate(g: seq<seq<int>>, i: int, newRow: seq<int>)
-    requires 0 <= i < |g|
-    requires forall k :: 0 <= k < |g| ==> |g[k]| == (if k == i then |g[i]| else |g[k]|) // 确保结构存在
-    requires |newRow| == |g[i]|
-    ensures CountNonZerosGrid(g[i := newRow]) == 
-            CountNonZerosGrid(g) - CountNonZerosRow(g[i]) + CountNonZerosRow(newRow)
-{
-    if i == 0 {
-    } else {
-        GridCountUpdate(g[1..], i - 1, newRow);
+    // Lemma 7: shows how to count non-zero tiles for a grid
+    lemma GridCountUpdate(g: seq<seq<int>>, i: int, newRow: seq<int>)
+        requires 0 <= i < |g|
+        requires forall k :: 0 <= k < |g| ==> |g[k]| == (if k == i then |g[i]| else |g[k]|) // 确保结构存在
+        requires |newRow| == |g[i]|
+        ensures CountNonZerosGrid(g[i := newRow]) == 
+                CountNonZerosGrid(g) - CountNonZerosRow(g[i]) + CountNonZerosRow(newRow)
+    {
+        if i == 0 {
+        } else {
+            GridCountUpdate(g[1..], i - 1, newRow);
+        }
     }
-}
 
     /***********************************************
     (2) predicates for well-performed rows and grids
@@ -246,12 +243,11 @@ lemma GridCountUpdate(g: seq<seq<int>>, i: int, newRow: seq<int>)
     }
 
     predicate WellPerformedGrid(grid: Grid) 
-        requires ValidGrid(grid)
     {
-        forall i :: 0 <= i < N ==> WellPerformedRow(grid[i])
+        ValidGrid(grid) && forall i :: 0 <= i < N ==> WellPerformedRow(grid[i])
     }
 
-    // lemmas based on above:
+    // Lemmas based on above:
     // Lemma 1: rows after filter and padding are well-performed
     lemma PaddingIsWellPerformed(nonZeros: seq<int>, numZeros: nat)
         requires forall x :: x in nonZeros ==> x != 0
@@ -279,7 +275,7 @@ lemma GridCountUpdate(g: seq<seq<int>>, i: int, newRow: seq<int>)
         }
     }
 
-    // lemma 2: if we apply move() on a well-performed row, nothing gonna change
+    // Lemma 2: if we apply move() on a well-performed row, nothing gonna change
     lemma WellPerformedRowFirstZeroAllZeros(row: seq<int>)
         requires WellPerformedRow(row)
         requires |row| > 0
@@ -291,26 +287,21 @@ lemma GridCountUpdate(g: seq<seq<int>>, i: int, newRow: seq<int>)
             assert row == [0];
             assert seq(1, _ => 0) == [0];
         } else {
-            // 由 well-performed 在 k=0 得到 row[1]==0
             assert row[0] == 0 ==> row[1] == 0;
             assert row[1] == 0;
 
-            // 证明后缀仍 well-performed
             assert WellPerformedRow(row[1..]) by {
                 forall k | 0 <= k < |row[1..]| - 1
                     ensures row[1..][k] == 0 ==> row[1..][k+1] == 0
                 {
-                    // row[1..][k] = row[k+1]
                     assert row[1..][k] == row[k+1];
                     assert row[1..][k+1] == row[k+2];
-                    // 用原 well-performed 的性质在索引 k+1 上
                     assert row[k+1] == 0 ==> row[k+2] == 0;
                 }
             }
 
             WellPerformedRowFirstZeroAllZeros(row[1..]);
 
-            // 拼回来
             assert row == [row[0]] + row[1..];
             assert row[1..] == seq(|row| - 1, _ => 0);
             assert row == [0] + seq(|row| - 1, _ => 0);
@@ -318,10 +309,8 @@ lemma GridCountUpdate(g: seq<seq<int>>, i: int, newRow: seq<int>)
         }
     }
 
-
-
     /*****
-    Extras
+    Others
     ******/
     lemma LemmaFullSlice<T>(s: seq<T>)
         ensures s[..|s|] == s
