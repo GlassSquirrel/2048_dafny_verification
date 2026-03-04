@@ -838,15 +838,13 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
     // 2. spec 3: does not change the state of the game
     ensures HasWinTile(mat) ==> HasWinTile(new_mat)
     ensures !HasWinTile(mat) ==> !HasWinTile(new_mat)
-    // ensures !HasWinTile(new_mat)
     ensures !IsLose(new_mat)
-    // 3. if done=True, then the mat changes
+    // 3.  spec 6: if done=True, then the mat changes
     ensures done == (new_mat != mat)
-    // 4. every row preserve the same element and non-zero element remain in same order
+    // 4.  spec 6: every row preserve the same element and non-zero element remain in same order
     ensures forall i :: 0 <= i < N ==> FilterNonZeros(new_mat[i]) == FilterNonZeros(mat[i])
     ensures CountNonZerosGrid(new_mat) == CountNonZerosGrid(mat)
-    // 5. performance of the row
-    // ensures WellPerformedGrid(new_mat)
+    // 5.  spec 6: performance of the row
     ensures WellPerformedGrid(new_mat)
     ensures WellPerformedGrid(mat) ==> !done
 {
@@ -1023,7 +1021,7 @@ if !HasWinTile(mat) {
 /**********
 (4) merge()
 ***********/
-// merge() merges the neighboring 2 tiles with same value, should satisfy spec 1, 2, 5
+// merge() merges the neighboring 2 tiles with same value, should satisfy spec 1, 2, 3, 5, 6
 // After merging 2 tiles, the number of non-zero tiles should -1
 
 // We have the following lemma for the two CountNonZeros functions
@@ -1069,7 +1067,7 @@ function merge_pair(row: seq<int>, j: int): (res: seq<int>)
     ensures forall k :: 0 <= k < |row| && k != j && k != j + 1 ==> res[k] == row[k]    // does not change other tiles
     ensures res[j] == 2048 ==> row[j] == 1024     // the generation of winning tile
     ensures res != row
-    ensures CountNonZerosRow(merge_pair(row, j)) == CountNonZerosRow(row) - 1
+    ensures CountNonZerosRow(merge_pair(row, j)) == CountNonZerosRow(row) - 1   // spec 1: after merging, count(non-zeros) should -1
 {
     var r1 := row[j := row[j] * 2];
     var r2 := r1[j+1 := 0];
@@ -1091,26 +1089,31 @@ function update_count(counts: seq<int>, j: int): seq<int>
     counts[j := counts[j] + 1][j + 1 := counts[j+1] + 1]
 }
 
-// The merge method should satisfy spec 1, 2, 5
+// The merge method should satisfy spec 1, 2, 3, 5, 6
 method merge(grid: Grid) returns (res: Grid, done: bool)
+    // Preconditions:
+    // 1. spec 2 & 5: value and grid validity
     requires ValidGrid(grid)
     requires ValidValues(grid)
-    // precondition for game state
+    // 2. game state
     requires !HasWinTile(grid)
     requires !IsLose(grid)
-    // precondition for wellperformed:
+    // 3. only receives wellperformed grid (after move)
     requires WellPerformedGrid(grid)
 
+    // Postconditions:
+    // 1. spec 2 & 5: value and grid validity
     ensures ValidGrid(res)     // spec 5
     ensures ValidValues(res)     // spec 2
+    // 2. spec 6: if done = true, then the board changes (including count)
     ensures !done ==> res == grid   
     ensures done == (res != grid)
     ensures !done ==> CountNonZerosGrid(res) == CountNonZerosGrid(grid)
     ensures done ==> CountNonZerosGrid(res) < CountNonZerosGrid(grid)
-    // spec 1: once merged, will have empty tile and game state cannot be lose
+    // 3. spec 1 & 3: once merged, will have empty tile and game state cannot be lose
     ensures done ==> HasEmptyTile(res)
     ensures !IsLose(res)
-    // for performance
+    // 4. spec 6: for performance, if done, can be well-performed or not well-performed; if !done, must be well-performed
     ensures !done ==> WellPerformedGrid(res)
 {
     res := grid;
@@ -1140,6 +1143,7 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
             invariant !done ==> res[i] == grid[i]
             invariant done <==> res != grid
             invariant |merged_counts| == N
+            // spec 1: for each tile, merge only happens once
             invariant forall k :: 0 <= k < N ==> 0 <= merged_counts[k] <= 1
             invariant forall k :: j <= k < N ==> merged_counts[k] == 0
             invariant forall k :: i < k < N ==> res[k] == grid[k]   // later rows remain unsolved
@@ -1149,7 +1153,7 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
             invariant done ==> CountNonZerosGrid(res) < CountNonZerosGrid(grid)
             invariant !done ==> CountNonZerosGrid(res) == CountNonZerosGrid(grid)
         {
-            if res[i][j] == res[i][j+1] && res[i][j] != 0 
+            if res[i][j] == res[i][j+1] && res[i][j] != 0 && merged_counts[j] == 0 && merged_counts[j+1] == 0
             {
                 // record before merge
                 var count_before := CountNonZerosGrid(res);
@@ -1170,6 +1174,9 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
                 assert res[i][j+1] == 0;
                 ImpliesNotLose(res);
 
+                assert 0 <= j < N - 1;
+                merged_counts := update_count(merged_counts, j);
+                
                 done := true; 
                 j := j + 2;   // skip the next merged grid
             }

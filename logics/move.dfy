@@ -7,6 +7,8 @@ module Move {
     /********* 
     (3) move()
     **********/
+    // Move should satisfy spec 2, 3, 5, 6
+    // For spec 3: after move(), the game state should not change 
     // First, we will have a new predicate to check if one row has the win tile 2048
     predicate HasWinTileRow(row: seq<int>)
         requires |row| == N
@@ -382,15 +384,13 @@ module Move {
         // 2. spec 3: does not change the state of the game
         ensures HasWinTile(mat) ==> HasWinTile(new_mat)
         ensures !HasWinTile(mat) ==> !HasWinTile(new_mat)
-        // ensures !HasWinTile(new_mat)
         ensures !IsLose(new_mat)
-        // 3. if done=True, then the mat changes
+        // 3.  spec 6: if done=True, then the mat changes
         ensures done == (new_mat != mat)
-        // 4. every row preserve the same element and non-zero element remain in same order
+        // 4.  spec 6: every row preserve the same element and non-zero element remain in same order
         ensures forall i :: 0 <= i < N ==> FilterNonZeros(new_mat[i]) == FilterNonZeros(mat[i])
         ensures CountNonZerosGrid(new_mat) == CountNonZerosGrid(mat)
-        // 5. performance of the row
-        // ensures WellPerformedGrid(new_mat)
+        // 5.  spec 6: performance of the row
         ensures WellPerformedGrid(new_mat)
         ensures WellPerformedGrid(mat) ==> !done
     {
