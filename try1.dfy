@@ -1089,6 +1089,8 @@ function update_count(counts: seq<int>, j: int): seq<int>
     counts[j := counts[j] + 1][j + 1 := counts[j+1] + 1]
 }
 
+
+
 // The merge method should satisfy spec 1, 2, 3, 5, 6
 method merge(grid: Grid) returns (res: Grid, done: bool)
     // Preconditions:
@@ -1191,42 +1193,6 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
 }
 
 // (7) left()
-// predicate IsFixedPoint(row: seq<int>) {
-//     |row| == N && 
-//     (forall j :: 0 <= j < |row| ==> row[j] == 0 || IsPowerOfTwo(row[j])) &&
-//     CompressRow(row).0 == row
-// }
-
-// predicate HasMergeableRow(row: seq<int>) {
-//     |row| == N &&
-//     exists j :: 0 <= j < N - 1 && row[j] != 0 && row[j] == row[j+1]
-// }
-
-// lemma DoneImpliesResultChanged(
-//     game: Grid,
-//     g1: Grid, g2: Grid, g3: Grid,
-//     d1: bool, d2: bool, d3: bool)
-// requires d1 == (g1 != game)
-// requires d2 == (g2 != g1)
-// requires d3 == (g3 != g2)
-// requires d1 || d2 || d3
-// ensures g3 != game
-// {
-//   // 反证
-//   if g3 == game {
-//     // 若 g3==game 且 g3==g2，则 d3 必为 false；同理推出 d2,d1 都为 false
-//     // 这在 Dafny 里会非常直接：
-//     assert g3 == game;
-//     if g3 == g2 {
-//       assert d3 == (g3 != g2);
-//       assert !d3;
-//     }
-//     // 但我们还不知道 g3==g2；不过如果 d3 为真则 g3!=g2，与 g3==game 并不直接矛盾
-//     // 所以继续推：若 g3==game 且 g2!=g3，则 d3=true，但这并不矛盾；因此需要传递不等式：
-//     // 关键点：如果 g3==game 且 g2!=g3，则 g2!=game；若再有 g1==g2 或 g1!=g2 依然...
-//     // 最终最短证明其实是用序列不等的传递不成立，所以仍要用 case。
-//   }
-// }
 lemma DoneImpliesResultChanged(
     game: Grid,
     g1: Grid, g2: Grid, g3: Grid,

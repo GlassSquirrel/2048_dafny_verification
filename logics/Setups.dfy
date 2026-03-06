@@ -330,4 +330,8 @@ module Setups {
         ensures s[..i+1] == s[..i] + [s[i]]
     {
     }
+
+    /*****
+    verify the generation of new tile
+    *****/
 }
