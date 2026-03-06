@@ -334,4 +334,44 @@ module Setups {
     /*****
     verify the generation of new tile
     *****/
+    method new_tile_validation(oldGrid: Grid, changed: bool, newGrid: Grid) returns (ok: bool)
+    ensures ok == (
+            ValidGrid(oldGrid) &&
+            ValidValues(oldGrid) &&
+            ValidGrid(newGrid) &&
+            ValidValues(newGrid) &&
+            (
+                (!changed && newGrid == oldGrid) ||
+                (changed &&
+                    exists i, j ::
+                        0 <= i < N && 0 <= j < N &&
+                        oldGrid[i][j] == 0 &&
+                        newGrid[i][j] == 2 &&
+                        (forall r, c ::
+                            0 <= r < N && 0 <= c < N &&
+                            (r != i || c != j) ==> newGrid[r][c] == oldGrid[r][c]
+                        )
+                )
+            )
+        )
+    {
+        ok :=
+            ValidGrid(oldGrid) &&
+            ValidValues(oldGrid) &&
+            ValidGrid(newGrid) &&
+            ValidValues(newGrid) &&
+            (
+                (!changed && newGrid == oldGrid) ||
+                (changed &&
+                    exists i, j ::
+                        0 <= i < N && 0 <= j < N &&
+                        oldGrid[i][j] == 0 &&
+                        newGrid[i][j] == 2 &&
+                        (forall r, c ::
+                            0 <= r < N && 0 <= c < N &&
+                            (r != i || c != j) ==> newGrid[r][c] == oldGrid[r][c]
+                        )
+                )
+            );
+    }
 }
