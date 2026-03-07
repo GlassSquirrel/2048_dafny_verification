@@ -6,11 +6,13 @@
 include "Setups.dfy"
 include "Move.dfy"
 include "Merge.dfy"
+include "Transform.dfy"
 
 module DirectionControls{
     import opened Setups
     import opened Move
     import opened Merge
+    import opened Transform
 
     lemma DoneImpliesResultChanged(
         game: Grid,
@@ -186,4 +188,244 @@ module DirectionControls{
             DoneImpliesResultChanged(game, g1, g2, g3, d1, d2, d3);
         }
     }
+
+
+    method right(game: Grid) returns (res: Grid, done: bool)
+    requires ValidGrid(game)
+    requires ValidValues(game)
+    requires !HasWinTile(game)
+    requires !IsLose(game)
+
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+    ensures done == (res != game)
+    ensures !done ==> res == game
+    ensures !IsLose(res)
+{
+    // Step 1: reverse the board, so right becomes left
+    var r1 := Reverse(game);
+
+    // Prove r1 satisfies left's preconditions
+    ReversePreservesValues(game);
+    ReversePreservesWin(game);
+    ReversePreservesLose(game);
+
+    assert ValidGrid(r1);
+    assert ValidValues(r1);
+    assert !HasWinTile(r1);
+    assert !IsLose(r1);
+
+    // Step 2: reuse verified left
+    var g, d := left(r1);
+
+    // Step 3: reverse back
+    ReversePreservesValues(g);
+    ReversePreservesLose(g);
+
+    var r2 := Reverse(g);
+
+    assert ValidGrid(r2);
+    assert ValidValues(r2);
+    assert !IsLose(r2);
+
+    res := r2;
+    done := d;
+
+    // Needed for proving res == game when nothing changed
+    ReverseInvolution(game);
+    ReverseInvolution(g);
+
+    if !done {
+        // from left's postcondition
+        assert g == r1;
+
+        // apply Reverse to both sides
+        assert Reverse(g) == Reverse(r1);
+
+        // unfold names
+        assert r2 == Reverse(g);
+        assert r1 == Reverse(game);
+
+        // reverse twice gives original
+        assert Reverse(g) == g ==> false || true; // harmless trigger hint if needed
+        assert res == game;
+    }
+
+    // prove done == (res != game)
+    if res == game {
+        assert r2 == game;
+        assert Reverse(g) == game;
+        assert Reverse(g) == Reverse(Reverse(game));
+        assert g == Reverse(game);
+        assert g == r1;
+        assert !d;
+    }
+
+    if res != game {
+        assert g != r1;
+        assert d;
+    }
+
+    assert done == (res != game);
+}
+
+method up(game: Grid) returns (res: Grid, done: bool)
+    requires ValidGrid(game)
+    requires ValidValues(game)
+    requires !HasWinTile(game)
+    requires !IsLose(game)
+
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+    ensures done == (res != game)
+    ensures !done ==> res == game
+    ensures !IsLose(res)
+{
+    // Step 1: transpose so that up becomes left
+    var t1 := Transpose(game);
+
+    // Prove t1 satisfies left's preconditions
+    TransposePreservesValues(game);
+    TransposePreservesWin(game);
+    TransposePreservesLose(game);
+
+    assert ValidGrid(t1);
+    assert ValidValues(t1);
+    assert !HasWinTile(t1);
+    assert !IsLose(t1);
+
+    // Step 2: reuse verified left
+    var g, d := left(t1);
+
+    // Step 3: transpose back
+    TransposePreservesValues(g);
+    TransposePreservesLose(g);
+
+    var t2 := Transpose(g);
+
+    assert ValidGrid(t2);
+    assert ValidValues(t2);
+    assert !IsLose(t2);
+
+    res := t2;
+    done := d;
+
+    // Needed for proving res == game when nothing changed
+    TransposeInvolution(game);
+    TransposeInvolution(g);
+
+    if !done {
+        assert g == t1;
+        assert Transpose(g) == Transpose(t1);
+        assert res == game;
+    }
+
+    if res == game {
+        assert t2 == game;
+        assert Transpose(g) == game;
+        assert Transpose(g) == Transpose(Transpose(game));
+        assert g == t1;
+        assert !d;
+    }
+
+    if res != game {
+        assert g != t1;
+        assert d;
+    }
+
+    assert done == (res != game);
+}
+
+method down(game: Grid) returns (res: Grid, done: bool)
+    requires ValidGrid(game)
+    requires ValidValues(game)
+    requires !HasWinTile(game)
+    requires !IsLose(game)
+
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+    ensures done == (res != game)
+    ensures !done ==> res == game
+    ensures !IsLose(res)
+{
+    // Step 1: transpose and reverse so that down becomes left
+    var t1 := Transpose(game);
+    var r1 := Reverse(t1);
+
+    // Prove t1 satisfies the transformation lemmas
+    TransposePreservesValues(game);
+    TransposePreservesWin(game);
+    TransposePreservesLose(game);
+
+    assert ValidGrid(t1);
+    assert ValidValues(t1);
+    assert !HasWinTile(t1);
+    assert !IsLose(t1);
+
+    // Prove r1 satisfies left's preconditions
+    ReversePreservesValues(t1);
+    ReversePreservesWin(t1);
+    ReversePreservesLose(t1);
+
+    assert ValidGrid(r1);
+    assert ValidValues(r1);
+    assert !HasWinTile(r1);
+    assert !IsLose(r1);
+
+    // Step 2: reuse verified left
+    var g, d := left(r1);
+
+    // Step 3: reverse back, then transpose back
+    ReversePreservesValues(g);
+    ReversePreservesLose(g);
+
+    var r2 := Reverse(g);
+
+    assert ValidGrid(r2);
+    assert ValidValues(r2);
+    assert !IsLose(r2);
+
+    TransposePreservesValues(r2);
+    TransposePreservesLose(r2);
+
+    var t2 := Transpose(r2);
+
+    assert ValidGrid(t2);
+    assert ValidValues(t2);
+    assert !IsLose(t2);
+
+    res := t2;
+    done := d;
+
+    // Needed for proving res == game when nothing changed
+    ReverseInvolution(t1);
+    ReverseInvolution(g);
+    TransposeInvolution(game);
+    TransposeInvolution(r2);
+
+    if !done {
+        assert g == r1;
+        assert Reverse(g) == Reverse(r1);
+        assert r2 == t1;
+        assert Transpose(r2) == Transpose(t1);
+        assert res == game;
+    }
+
+    if res == game {
+        assert t2 == game;
+        assert Transpose(r2) == game;
+        assert Transpose(r2) == Transpose(Transpose(game));
+        assert r2 == t1;
+        assert Reverse(g) == Reverse(r1);
+        assert g == r1;
+        assert !d;
+    }
+
+    if res != game {
+        assert g != r1;
+        assert d;
+    }
+
+    assert done == (res != game);
+}
 }
