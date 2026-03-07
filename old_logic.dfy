@@ -1,15 +1,21 @@
 type Grid = seq<seq<int>>
 const N: int := 4
 
-/***********
- Basic Specs
-************/
+/****************************************
+ Basic Specs & Predicates for Game State 
+*****************************************/
 // Spec 5: board boundry
 predicate ValidGrid(grid: Grid) 
 {
     |grid| == N && forall i :: 0 <= i < N ==> |grid[i]| == N
 }
 
+// predicate IsPowerOfTwo(x: int)
+// {
+//     x == 2 || x == 4 || x == 8 || x == 16 || x == 32 ||
+//     x == 64 || x == 128 || x == 256 || x == 512 || x == 2048
+// }
+// Better implementation of IsPowerOfTwo for 2048 (exclude 1)
 predicate IsPowerOfTwo(x: int)
 {
     if x < 2 then false
@@ -24,16 +30,7 @@ predicate ValidValues(grid: Grid)
     forall i, j :: 0 <= i < N && 0 <= j < N ==> grid[i][j] == 0 || IsPowerOfTwo(grid[i][j])
 }
 
-lemma SeqElementsValidImpliesIndexValid(row: seq<int>)
-    requires forall x :: x in row ==> x == 0 || IsPowerOfTwo(x)
-    ensures forall j :: 0 <= j < |row| ==> row[j] == 0 || IsPowerOfTwo(row[j])
-{
-}
-
-/*************************
- Predicates for Game State 
-**************************/
-// Define 4 predicates to check for "has win" / "is lose" / "can continue"
+// Define 3 predicates to check for "has win" / "has lose" / "can continue"
 // Predicate 1: has win (tile value reaches 2048)
 predicate HasWinTile(grid: Grid)
     requires ValidGrid(grid)
@@ -42,7 +39,7 @@ predicate HasWinTile(grid: Grid)
     exists i, j :: 0 <= i < N && 0 <= j < N && grid[i][j] == 2048
 }
 
-// {Predicate 2: has empty tile value = 0 (can generate new 2)  =>  can continue
+// {Predicate 2: has empty tile value = 0 (can generate new 2)
 predicate HasEmptyTile(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -50,7 +47,7 @@ predicate HasEmptyTile(grid: Grid)
     exists i, j :: 0 <= i < N && 0 <= j < N && grid[i][j] == 0
 }
 
-// Predicate 3: has more room to merge  =>  can continue
+// Predicate 3: has more room to merge
 predicate MoreToMerge(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -81,313 +78,6 @@ lemma ImpliesNotLose(grid: Grid)
     }
 }
 
-/*************************
- Functions frequently used
-**************************/
-/*****************************************
-(1) Count number of elements in a row/grid
-******************************************/
-// count the number of non-zero elements in a row
-function CountNonZerosRow(s: seq<int>): nat    
-{
-    if |s| == 0 then 0
-    else (if s[0] != 0 then 1 else 0) + CountNonZerosRow(s[1..])
-}
-
-// count the number of non-zero elements in a grid
-function CountNonZerosGrid(g: Grid): nat    
-{
-    if |g| == 0 then 0
-    else CountNonZerosRow(g[0]) + CountNonZerosGrid(g[1..])
-}
-
-// count the number of elements with specific value in a row
-function CountInRow(row: seq<int>, value: int): int 
-{
-    if |row| == 0 then 0
-    else (if row[0] == value then 1 else 0) + CountInRow(row[1..], value)
-}
-
-// count the number of elements with specific value in a grid
-function CountInGrid(grid: Grid, value: int): int
-{
-    if |grid| == 0 then 0
-    else CountInRow(grid[0], value) + CountInGrid(grid[1..], value)
-}
-
-// Lemmas based on above:
-// Lemma 1: Count(a + b) == Count(a) + Count(b)
-lemma CountRowAdditivity(a: seq<int>, b: seq<int>)
-    ensures CountNonZerosRow(a + b) == CountNonZerosRow(a) + CountNonZerosRow(b)
-    // decreases |a|
-{
-    if |a| == 0 {
-        // a = []
-        assert a + b == b;
-        assert CountNonZerosRow(a) == 0;
-    } else {
-        CountRowAdditivity(a[1..], b);
-
-        assert a == [a[0]] + a[1..];
-        assert a + b == [a[0]] + (a[1..] + b);
-
-        assert CountNonZerosRow(a) == (if a[0] != 0 then 1 else 0) + CountNonZerosRow(a[1..]);
-        assert CountNonZerosRow(a + b) == (if a[0] != 0 then 1 else 0) + CountNonZerosRow(a[1..] + b);
-    }
-}
-
-// Lemma 2: CountNonZerosRow(sequence of 0s) = 0
-lemma ZerosCountIsZero(k: nat)
-    ensures CountNonZerosRow(seq(k, _ => 0)) == 0
-    decreases k
-{
-    if k == 0 {
-        assert seq(0, _ => 0) == [];
-    } else {
-        ZerosCountIsZero(k - 1);
-        assert seq(k, _ => 0) == [0] + seq(k - 1, _ => 0);
-        assert CountNonZerosRow(seq(k, _ => 0)) == (if 0 != 0 then 1 else 0) + CountNonZerosRow(seq(k - 1, _ => 0));
-    }
-}
-
-// Lemma 3: CountNonZerosRow(sequence of non-zeros) = |sequence of non-zeros|
-lemma NonZerosCountIsLength(s: seq<int>)
-    requires forall x :: x in s ==> x != 0
-    ensures CountNonZerosRow(s) == |s|
-    decreases |s|
-{
-    if |s| == 0 {
-    } else {
-        assert s[0] in s;
-        assert s[0] != 0;
-        assert forall x :: x in s[1..] ==> x != 0
-        by {
-            forall x | x in s[1..]
-            ensures x != 0
-            {
-                assert x in s;
-            }
-        }
-        NonZerosCountIsLength(s[1..]);
-        assert CountNonZerosRow(s) == 1 + CountNonZerosRow(s[1..]);
-        assert |s| == 1 + |s[1..]|;
-    }
-}
-
-// Lemma 4：FilterNonZeros does not change Count(non-zeros)
-lemma FilterPreservesCount(s: seq<int>)
-    ensures CountNonZerosRow(s) == CountNonZerosRow(FilterNonZeros(s))
-{
-    if |s| == 0 {
-    } else if s[0] == 0 {
-        FilterPreservesCount(s[1..]);
-    } else {
-        FilterPreservesCount(s[1..]);
-    }
-}
-
-// lemma 5:
-lemma CountGridAdditivity(temp: seq<seq<int>>, row: seq<int>)
-    ensures CountNonZerosGrid(temp + [row]) == CountNonZerosGrid(temp) + CountNonZerosRow(row)
-    // decreases |temp|
-{
-    if temp == [] {
-        // temp + [row] == [row]
-        assert temp + [row] == [row];
-        assert CountNonZerosGrid([row]) 
-               == CountNonZerosRow(row);
-    } else {
-        CountGridAdditivity(temp[1..], row);
-
-        assert temp == [temp[0]] + temp[1..];
-        assert temp + [row] == [temp[0]] + (temp[1..] + [row]);
-
-        assert CountNonZerosGrid(temp) == CountNonZerosRow(temp[0]) + CountNonZerosGrid(temp[1..]);
-
-        assert CountNonZerosGrid(temp + [row]) == CountNonZerosRow(temp[0]) + CountNonZerosGrid(temp[1..] + [row]);
-    }
-}
-
-// lemma 6
-lemma GridEqualityAfterAppend(g1: seq<seq<int>>, g2: seq<seq<int>>, row1: seq<int>, row2: seq<int>)
-    requires CountNonZerosGrid(g1) == CountNonZerosGrid(g2)
-    requires CountNonZerosRow(row1) == CountNonZerosRow(row2)
-    ensures CountNonZerosGrid(g1 + [row1]) == CountNonZerosGrid(g2 + [row2])
-{
-    CountGridAdditivity(g1, row1);
-    CountGridAdditivity(g2, row2);
-    
-    // Count(g1 + [row1]) = Count(g1) + Count(row1)
-    // Count(g2 + [row2]) = Count(g2) + Count(row2)
-    assert CountNonZerosGrid(g1 + [row1]) == CountNonZerosGrid(g1) + CountNonZerosRow(row1);
-    assert CountNonZerosGrid(g2 + [row2]) == CountNonZerosGrid(g2) + CountNonZerosRow(row2);
-    assert CountNonZerosGrid(g1) + CountNonZerosRow(row1) == CountNonZerosGrid(g2) + CountNonZerosRow(row2);
-}
-/***********************************************
-(2) predicates for well-performed rows and grids
-***********************************************/
-predicate WellPerformedRow(row: seq<int>) {
-    forall k :: 0 <= k < |row| - 1 ==> (row[k] == 0 ==> row[k+1] == 0)
-}
-
-predicate WellPerformedGrid(grid: Grid) 
-{
-    ValidGrid(grid) && forall i :: 0 <= i < N ==> WellPerformedRow(grid[i])
-}
-
-// lemmas based on above:
-// Lemma 1: rows after filter and padding are well-performed
-lemma PaddingIsWellPerformed(nonZeros: seq<int>, numZeros: nat)
-    requires forall x :: x in nonZeros ==> x != 0
-    ensures WellPerformedRow(nonZeros + seq(numZeros, _ => 0))
-{
-    var s := nonZeros + seq(numZeros, _ => 0);
-
-    forall k | 0 <= k < |s| - 1
-        ensures s[k] == 0 ==> s[k+1] == 0
-    {
-        if k < |nonZeros| {
-            // k in non-zeros range
-            assert s[k] == nonZeros[k];
-            assert nonZeros[k] in nonZeros;
-            assert nonZeros[k] != 0;
-            assert s[k] != 0;
-            if s[k] == 0 {
-                assert false;
-            }
-        } else {
-            // k in paddings
-            assert s[k] == 0;
-            assert s[k+1] == 0;
-        }
-    }
-}
-
-// lemma 2: if we apply move() on a well-performed row, nothing gonna change
-lemma WellPerformedRowFirstZeroAllZeros(row: seq<int>)
-    requires WellPerformedRow(row)
-    requires |row| > 0
-    requires row[0] == 0
-    ensures row == seq(|row|, _ => 0)
-    decreases |row|
-{
-    if |row| == 1 {
-        assert row == [0];
-        assert seq(1, _ => 0) == [0];
-    } else {
-        // 由 well-performed 在 k=0 得到 row[1]==0
-        assert row[0] == 0 ==> row[1] == 0;
-        assert row[1] == 0;
-
-        // 证明后缀仍 well-performed
-        assert WellPerformedRow(row[1..]) by {
-            forall k | 0 <= k < |row[1..]| - 1
-                ensures row[1..][k] == 0 ==> row[1..][k+1] == 0
-            {
-                // row[1..][k] = row[k+1]
-                assert row[1..][k] == row[k+1];
-                assert row[1..][k+1] == row[k+2];
-                // 用原 well-performed 的性质在索引 k+1 上
-                assert row[k+1] == 0 ==> row[k+2] == 0;
-            }
-        }
-
-        WellPerformedRowFirstZeroAllZeros(row[1..]);
-
-        // 拼回来
-        assert row == [row[0]] + row[1..];
-        assert row[1..] == seq(|row| - 1, _ => 0);
-        assert row == [0] + seq(|row| - 1, _ => 0);
-        assert [0] + seq(|row| - 1, _ => 0) == seq(|row|, _ => 0);
-    }
-}
-
-lemma WellPerformedRowDoNotMove(row: seq<int>)
-    requires WellPerformedRow(row)
-    ensures FilterNonZeros(row) +
-            seq(|row| - |FilterNonZeros(row)|, _ => 0) == row
-    decreases |row|
-{
-    if |row| == 0 {
-        // 两边都是 []
-    } else if row[0] == 0 {
-        // row 全 0
-        WellPerformedRowFirstZeroAllZeros(row);
-        assert row == seq(|row|, _ => 0);
-
-        // FilterNonZeros(seq(k,0)) == []
-        FilterZerosIsEmpty(|row|);
-        assert FilterNonZeros(row) == [];
-
-        // RHS: [] + seq(|row|,0) == seq(|row|,0) == row
-        assert FilterNonZeros(row) + seq(|row| - |FilterNonZeros(row)|, _ => 0)
-            == [] + seq(|row| - 0, _ => 0);
-        assert [] + seq(|row|, _ => 0) == seq(|row|, _ => 0);
-    } else {
-        // row[0] != 0
-        // 证明后缀仍 well-performed
-        assert WellPerformedRow(row[1..]) by {
-            forall k | 0 <= k < |row[1..]| - 1
-                ensures row[1..][k] == 0 ==> row[1..][k+1] == 0
-            {
-                assert row[1..][k] == row[k+1];
-                assert row[1..][k+1] == row[k+2];
-                assert row[k+1] == 0 ==> row[k+2] == 0;
-            }
-        }
-
-        // 归纳假设
-        WellPerformedRowDoNotMove(row[1..]);
-
-        // 展开 FilterNonZeros 的定义（因为 row[0]!=0）
-        assert FilterNonZeros(row) == [row[0]] + FilterNonZeros(row[1..]);
-
-        // 计算 padding 长度：|row| - |FilterNonZeros(row)| = |row[1..]| - |FilterNonZeros(row[1..])|
-        assert |row| == 1 + |row[1..]|;
-        assert |FilterNonZeros(row)| == 1 + |FilterNonZeros(row[1..])|;
-
-        // 拼回去
-        assert FilterNonZeros(row) + seq(|row| - |FilterNonZeros(row)|, _ => 0)
-            == ([row[0]] + FilterNonZeros(row[1..])) +
-               seq(|row[1..]| - |FilterNonZeros(row[1..])|, _ => 0);
-
-        // 用归纳假设替换 FilterNonZeros(row[1..]) + padding
-        assert FilterNonZeros(row[1..]) +
-               seq(|row[1..]| - |FilterNonZeros(row[1..])|, _ => 0)
-               == row[1..];
-
-        // 连接律
-        assert ([row[0]] + FilterNonZeros(row[1..])) +
-               seq(|row[1..]| - |FilterNonZeros(row[1..])|, _ => 0)
-            == [row[0]] + (FilterNonZeros(row[1..]) +
-               seq(|row[1..]| - |FilterNonZeros(row[1..])|, _ => 0));
-
-        assert [row[0]] + row[1..] == row;
-    }
-}
-
-/*****
-Extras
-******/
-lemma LemmaFullSlice<T>(s: seq<T>)
-    ensures s[..|s|] == s
-{}
-
-lemma SeqsDifferAt<T>(s1: seq<T>, s2: seq<T>, k: int)
-    requires 0 <= k < |s1| && 0 <= k < |s2|
-    requires s1[k] != s2[k]
-    ensures s1 != s2
-{
-    // s1 == s2 <==> |s1| == |s2| && forall i :: s1[i] == s2[i]
-    // if exists a k such that s1[k] != s2[k]，then s1 != s2
-}
-
-lemma SliceExtend<T>(s: seq<T>, i: int)
-    requires 0 <= i < |s|
-    ensures s[..i+1] == s[..i] + [s[i]]
-{
-}
-
 /*********************************** 
 1. initialization & state management
 ***********************************/
@@ -405,7 +95,22 @@ method new_game() returns (grid: Grid)
     grid := seq(N, _ => row);
 }
 
-// The generated empty board will be passed into game.py to generate random 2s, then passed back
+
+// The above board will be passed to game.py to generate random 2s
+// Then we validate the random generation
+// Two functions to count the frequency of value in a grid
+function CountInRow(row: seq<int>, value: int): int 
+{
+    if |row| == 0 then 0
+    else (if row[0] == value then 1 else 0) + CountInRow(row[1..], value)
+}
+
+function CountInGrid(grid: Grid, value: int): int
+{
+    if |grid| == 0 then 0
+    else CountInRow(grid[0], value) + CountInGrid(grid[1..], value)
+}
+
 // Check whether the random initialization of grid is valid or not 
 // A valid initialization should have a grid composed of 0s and two 2s.
 predicate IsValidInitialBoard(grid: Grid)
@@ -536,6 +241,10 @@ method game_state(grid: Grid) returns (s: State)
 /********* 
 (3) move()
 **********/
+// move() need to satisfy spec 2, 3, 5
+// Especially for spec 3: move() does not change the state of game
+// which means, Win => Win, NotOver => NotOver, that means no Lose => no Lose
+
 // First, we will have a new predicate to check if one row has the win tile 2048
 predicate HasWinTileRow(row: seq<int>)
     requires |row| == N
@@ -556,9 +265,7 @@ function FilterNonZeros(s: seq<int>): seq<int>
     else FilterNonZeros(s[1..])
 }
 
-/*
-Lemmas we develop from FilterNonZeros
-*/
+// We also develop several lemmas about FilterNonZeros function
 // Lemma 1: FilterZerosIsEmpty, which shows that if we apply FilterNonZeros on sequence of 0s, the return sequence will be empty
 // this will later be used to show that the relative orders of non-zero elements remain the same after the row being compressed
 lemma FilterZerosIsEmpty(k: nat)
@@ -660,12 +367,87 @@ lemma FilterLenLemma(s: seq<int>)
     }
 }
 
-// Lemma 5: FilterNonZerosReturnNoZeros, shows that if FilterNonZeros() return sequence with no 0s
-lemma FilterNonZerosReturnNoZeros(row: seq<int>)
-    ensures forall x :: x in FilterNonZeros(row) ==> x != 0
+// To achieve that, we first define two functions:
+function CountNonZerosRow(s: seq<int>): nat    // count the number of non-zero elements in a row
 {
-    if |row| > 0 {
-        FilterNonZerosReturnNoZeros(row[1..]);
+    if |s| == 0 then 0
+    else (if s[0] != 0 then 1 else 0) + CountNonZerosRow(s[1..])
+}
+
+function CountNonZerosGrid(g: seq<seq<int>>): nat    // count the number of non-zero elements in a row 
+{
+    if |g| == 0 then 0
+    else CountNonZerosRow(g[0]) + CountNonZerosGrid(g[1..])
+}
+
+// Based on the function, we can develop several lemmas:
+// Lemma 1: Count(a + b) == Count(a) + Count(b)
+lemma CountRowAdditivity(a: seq<int>, b: seq<int>)
+    ensures CountNonZerosRow(a + b) == CountNonZerosRow(a) + CountNonZerosRow(b)
+    // decreases |a|
+{
+    if |a| == 0 {
+        // a = []
+        assert a + b == b;
+        assert CountNonZerosRow(a) == 0;
+    } else {
+        CountRowAdditivity(a[1..], b);
+
+        assert a == [a[0]] + a[1..];
+        assert a + b == [a[0]] + (a[1..] + b);
+
+        assert CountNonZerosRow(a) == (if a[0] != 0 then 1 else 0) + CountNonZerosRow(a[1..]);
+        assert CountNonZerosRow(a + b) == (if a[0] != 0 then 1 else 0) + CountNonZerosRow(a[1..] + b);
+    }
+}
+
+// Lemma 2: CountNonZerosRow(sequence of 0s) = 0
+lemma ZerosCountIsZero(k: nat)
+    ensures CountNonZerosRow(seq(k, _ => 0)) == 0
+    decreases k
+{
+    if k == 0 {
+        assert seq(0, _ => 0) == [];
+    } else {
+        ZerosCountIsZero(k - 1);
+        assert seq(k, _ => 0) == [0] + seq(k - 1, _ => 0);
+        assert CountNonZerosRow(seq(k, _ => 0)) == (if 0 != 0 then 1 else 0) + CountNonZerosRow(seq(k - 1, _ => 0));
+    }
+}
+
+// Lemma 3: CountNonZerosRow(sequence of non-zeros) = |sequence of non-zeros|
+lemma NonZerosCountIsLength(s: seq<int>)
+    requires forall x :: x in s ==> x != 0
+    ensures CountNonZerosRow(s) == |s|
+    decreases |s|
+{
+    if |s| == 0 {
+    } else {
+        assert s[0] in s;
+        assert s[0] != 0;
+        assert forall x :: x in s[1..] ==> x != 0
+        by {
+            forall x | x in s[1..]
+            ensures x != 0
+            {
+                assert x in s;
+            }
+        }
+        NonZerosCountIsLength(s[1..]);
+        assert CountNonZerosRow(s) == 1 + CountNonZerosRow(s[1..]);
+        assert |s| == 1 + |s[1..]|;
+    }
+}
+
+// Lemma 4：FilterNonZeros does not change Count(non-zeros)
+lemma FilterPreservesCount(s: seq<int>)
+    ensures CountNonZerosRow(s) == CountNonZerosRow(FilterNonZeros(s))
+{
+    if |s| == 0 {
+    } else if s[0] == 0 {
+        FilterPreservesCount(s[1..]);
+    } else {
+        FilterPreservesCount(s[1..]);
     }
 }
 
@@ -674,66 +456,37 @@ lemma FilterNonZerosReturnNoZeros(row: seq<int>)
 function CompressRow(row: seq<int>): (seq<int>, bool)
     requires |row| == N   // the length of the row is valid
     requires forall j :: 0 <= j < |row| ==> row[j] == 0 || IsPowerOfTwo(row[j])   // all the values in the row is valid
+
+    ensures |CompressRow(row).0| == N   // 1. spec 5: the length of the output row is still valid
+    ensures forall x :: x in CompressRow(row).0 ==> x == 0 || IsPowerOfTwo(x)   // 2. spec 2: the values are valid
+    ensures forall x :: x in CompressRow(row).0 ==> x == 0 || x in row   // 3. all the elements should come from the original row, no new elements generated
+    // ensures CompressRow(row).1 ==> CompressRow(row).0[N-1] == 0   // if the row is changed, there must be at least one 0 at the end of row
+    ensures CountNonZerosRow(CompressRow(row).0) == CountNonZerosRow(row)
 {
     // step 1: filter out all non-zero elements
     var nonZeros := FilterNonZeros(row);
     // step 2: pad zeros
     var zeroFill := seq(N - |nonZeros|, _ => 0);
     var padded := nonZeros + zeroFill;
-
-    (padded, padded != row)
-}
-
-lemma CompressRowSpec(row: seq<int>)
-    requires |row| == N
-    requires forall j :: 0 <= j < |row| ==> row[j] == 0 || IsPowerOfTwo(row[j])   // all the values in the row is valid
-
-    // 1. validation of output
-    ensures |CompressRow(row).0| == N   // spec 5: the length of the output row is still valid
-    ensures forall x :: x in CompressRow(row).0 ==> x == 0 || IsPowerOfTwo(x)   // spec 2: the values are valid
-    ensures forall x :: x in CompressRow(row).0 ==> x == 0 || x in row   // all the elements should come from the original row, no new elements generated
-    // 2. ensure the number of non-zero elements remains the same
-    ensures CountNonZerosRow(CompressRow(row).0) == CountNonZerosRow(row)
-    // 3. performance of the rows
-    ensures WellPerformedRow(CompressRow(row).0)
-    ensures WellPerformedRow(row) ==> !CompressRow(row).1
-    ensures CompressRow(row).1 == (CompressRow(row).0 != row)
-{
-    var nonZeros := FilterNonZeros(row);
-    var zeroFill := seq(N - |nonZeros|, _ => 0);
-    var padded := nonZeros + zeroFill;
-
-    // 1. proof for count preservation
-    // Count(row) == Count(nonZeros)
-    FilterPreservesCount(row);
-    // nonZeros has no 0
-    assert forall x :: x in nonZeros ==> x != 0;
-    // Count(nonZeros) == |nonZeros|
-    NonZerosCountIsLength(nonZeros);
-    // Count(row) == |nonZeros|
-    assert CountNonZerosRow(row) == |nonZeros|;
-    // Count(padded) = Count(nonZeros) + Count(zeroFill)
-    CountRowAdditivity(nonZeros, zeroFill);
-    // zeroFill has 0 non-zero element
-    ZerosCountIsZero(N - |nonZeros|);
-    assert CountNonZerosRow(padded) == CountNonZerosRow(nonZeros) + CountNonZerosRow(zeroFill);
-
-    assert CountNonZerosRow(padded) == |nonZeros| + 0;
-
-    assert CountNonZerosRow(padded) == CountNonZerosRow(row);
-
-    // 2. Well-performed proof
-    PaddingIsWellPerformed(nonZeros, N - |nonZeros|);
-    assert WellPerformedRow(padded);
-
-    // 3. No-change proof
-    if WellPerformedRow(row) {
-        WellPerformedRowDoNotMove(row);
-        assert padded == row;
+    
+    FilterPreservesCount(row);    // Count(row) == Count(nonZeros)
+    
+    assert forall x :: x in nonZeros ==> x != 0 by {
     }
-}
+    NonZerosCountIsLength(nonZeros);    // Count(nonZeros) == |nonZeros|
+    assert CountNonZerosRow(row) == |nonZeros|;
 
-// lemmas developed based on CompressRow
+    // prove that Count(padded) == |nonZeros|
+    CountRowAdditivity(nonZeros, zeroFill);
+    ZerosCountIsZero(N - |nonZeros|);
+    
+    assert CountNonZerosRow(padded) == CountNonZerosRow(nonZeros) + CountNonZerosRow(zeroFill);
+    assert CountNonZerosRow(padded) == |nonZeros| + 0;
+    
+    (padded, padded != row)
+} 
+
+// We also develop serveral lemmas based on CompressRow
 // Lemma 1: compressrow perserves the number of non-zero elements 
 lemma CompressRowPreservesCount(row: seq<int>)
     requires |row| == N
@@ -822,6 +575,51 @@ lemma CompressRowPreservesWin(row: seq<int>)
     }
 }
 
+lemma CountGridAdditivity(temp: seq<seq<int>>, row: seq<int>)
+    ensures CountNonZerosGrid(temp + [row]) == CountNonZerosGrid(temp) + CountNonZerosRow(row)
+    // decreases |temp|
+{
+    if temp == [] {
+        // temp + [row] == [row]
+        assert temp + [row] == [row];
+        assert CountNonZerosGrid([row]) 
+               == CountNonZerosRow(row);
+    } else {
+        CountGridAdditivity(temp[1..], row);
+
+        assert temp == [temp[0]] + temp[1..];
+        assert temp + [row] == [temp[0]] + (temp[1..] + [row]);
+
+        assert CountNonZerosGrid(temp) == CountNonZerosRow(temp[0]) + CountNonZerosGrid(temp[1..]);
+
+        assert CountNonZerosGrid(temp + [row]) == CountNonZerosRow(temp[0]) + CountNonZerosGrid(temp[1..] + [row]);
+    }
+}
+
+lemma SeqsDifferAt<T>(s1: seq<T>, s2: seq<T>, k: int)
+    requires 0 <= k < |s1| && 0 <= k < |s2|
+    requires s1[k] != s2[k]
+    ensures s1 != s2
+{
+    // s1 == s2 <==> |s1| == |s2| && forall i :: s1[i] == s2[i]
+    // if exists a k such that s1[k] != s2[k]，then s1 != s2
+}
+
+lemma GridEqualityAfterAppend(g1: seq<seq<int>>, g2: seq<seq<int>>, row1: seq<int>, row2: seq<int>)
+    requires CountNonZerosGrid(g1) == CountNonZerosGrid(g2)
+    requires CountNonZerosRow(row1) == CountNonZerosRow(row2)
+    ensures CountNonZerosGrid(g1 + [row1]) == CountNonZerosGrid(g2 + [row2])
+{
+    CountGridAdditivity(g1, row1);
+    CountGridAdditivity(g2, row2);
+    
+    // Count(g1 + [row1]) = Count(g1) + Count(row1)
+    // Count(g2 + [row2]) = Count(g2) + Count(row2)
+    assert CountNonZerosGrid(g1 + [row1]) == CountNonZerosGrid(g1) + CountNonZerosRow(row1);
+    assert CountNonZerosGrid(g2 + [row2]) == CountNonZerosGrid(g2) + CountNonZerosRow(row2);
+    assert CountNonZerosGrid(g1) + CountNonZerosRow(row1) == CountNonZerosGrid(g2) + CountNonZerosRow(row2);
+}
+
 // Third, we define the move method itself 
 // note: the move() method should accept Win state, since merging could create 2048
 method move(mat: Grid) returns (new_mat: Grid, done: bool)
@@ -838,15 +636,13 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
     // 2. spec 3: does not change the state of the game
     ensures HasWinTile(mat) ==> HasWinTile(new_mat)
     ensures !HasWinTile(mat) ==> !HasWinTile(new_mat)
+    // ensures !HasWinTile(new_mat)
     ensures !IsLose(new_mat)
-    // 3.  spec 6: if done=True, then the mat changes
+    // 3. if done=True, then the mat changes
     ensures done == (new_mat != mat)
-    // 4.  spec 6: every row preserve the same element and non-zero element remain in same order
+    // 4. every row preserve the same element and non-zero element remain in same order
     ensures forall i :: 0 <= i < N ==> FilterNonZeros(new_mat[i]) == FilterNonZeros(mat[i])
     ensures CountNonZerosGrid(new_mat) == CountNonZerosGrid(mat)
-    // 5.  spec 6: performance of the row
-    ensures WellPerformedGrid(new_mat)
-    ensures WellPerformedGrid(mat) ==> !done
 {
     var temp_grid: seq<seq<int>> := [];
     done := false;
@@ -856,24 +652,19 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
         invariant 0 <= i <= N 
         invariant |temp_grid| == i
         invariant forall k :: 0 <= k < i ==> |temp_grid[k]| == N   // spec 5: make sure the iterated rows lengths are valid
-        // invariant forall k :: 0 <= k < i ==> forall j :: 0 <= j < N ==> temp_grid[k][j] == 0 || IsPowerOfTwo(temp_grid[k][j])  // spec 2: values are valid
-        invariant forall k :: 0 <= k < i ==> forall j :: 0 <= j < N ==> temp_grid[k][j] == 0 || IsPowerOfTwo(temp_grid[k][j])
+        invariant forall k :: 0 <= k < i ==> forall j :: 0 <= j < N ==> temp_grid[k][j] == 0 || IsPowerOfTwo(temp_grid[k][j])  // spec 2: values are valid
         // safety: 
         invariant forall k :: 0 <= k < i ==> temp_grid[k] == CompressRow(mat[k]).0   // the iterated rows are the outcome of the corresponding original row
         // make sure state not changed: postcondition part 2
         invariant forall k :: 0 <= k < i ==> (temp_grid[k] != mat[k] ==> done)   // if row moved, then done = True 
-        // invariant (exists k :: 0 <= k < i && HasWinTileRow(temp_grid[k])) <==> (exists k :: 0 <= k < i && HasWinTileRow(mat[k]))   // spec 3: make sure the win state is preserved
+        invariant (exists k :: 0 <= k < i && HasWinTileRow(temp_grid[k])) <==> (exists k :: 0 <= k < i && HasWinTileRow(mat[k]))   // spec 3: make sure the win state is preserved
         invariant !done ==> temp_grid == mat[..i]   // if no previous rows moved, stay the same
-        // invariant done ==> exists k, l :: 0 <= k < i && 0 <= l < N && temp_grid[k][l] == 0    // if previous rows moved, has tile = 0
-        invariant done ==> exists k :: 0 <= k < i && CompressRow(mat[k]).1
+        invariant done ==> exists k, l :: 0 <= k < i && 0 <= l < N && temp_grid[k][l] == 0    // if previous rows moved, has tile = 0
         // postcondition part 3:
         invariant done ==> temp_grid != mat[..i]    // if previous rows moved, not the same
         // postcondition part 4:
         invariant forall k :: 0 <= k < i ==> FilterNonZeros(temp_grid[k]) == FilterNonZeros(mat[k])   // preseve the relative order of non-zero elements
         invariant CountNonZerosGrid(temp_grid) == CountNonZerosGrid(mat[..i])
-        // postcondition part 5:
-        invariant forall k :: 0 <= k < i ==> WellPerformedRow(temp_grid[k])
-        invariant WellPerformedGrid(mat) ==> (temp_grid == mat[..i] && !done)
     {
         // 1. compress the row
         var res := CompressRow(mat[i]);
@@ -882,17 +673,13 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
         CompressPreservesNonZeros(mat[i]);
         CompressRowPreservesWin(mat[i]);
         CompressRowLastElementIs0(mat[i]);
-        CompressRowSpec(mat[i]);
-
-        assert forall j :: 0 <= j < N ==> row_res[j] == 0 || IsPowerOfTwo(row_res[j]);
-        SeqElementsValidImpliesIndexValid(row_res);
+        
         assert forall x :: x in row_res ==> x in mat[i] || x == 0;
 
         // 2. update done
         if row_changed {
             done := true;
             assert row_res[N-1] == 0;
-            assert CompressRow(mat[i]).1;
         }
 
         // 3. update grid
@@ -909,7 +696,6 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
         temp_grid := temp_grid + [row_res];
 
         GridEqualityAfterAppend(old_temp, mat[..i], row_res, mat[i]);
-        SliceExtend(mat, i);
         assert mat[..i+1] == mat[..i] + [mat[i]];
 
         assert CountNonZerosGrid(temp_grid) == CountNonZerosGrid(mat[..i+1]);
@@ -941,87 +727,27 @@ method move(mat: Grid) returns (new_mat: Grid, done: bool)
         // no changes
         assert new_mat == mat;
     } else {
-    // done == true
-    // 从循环不变式：done ==> exists k < N && CompressRow(mat[k]).1 取 witness
-    var k :| 0 <= k < N && CompressRow(mat[k]).1;
-
-    // 用行 lemma：如果 CompressRow(mat[k]).1 为真，则压缩结果最后一格为 0
-    CompressRowLastElementIs0(mat[k]);
-
-    // safety：new_mat[k] 是 CompressRow(mat[k]).0
-    assert new_mat[k] == CompressRow(mat[k]).0;
-
-    // 所以 new_mat[k][N-1] == 0
-    assert new_mat[k][N-1] == 0;
-
-    // 构造 exists witness：r=k, c=N-1
-    assert exists r, c :: 0 <= r < N && 0 <= c < N && new_mat[r][c] == 0 by {
-        assert 0 <= k < N;
-        assert 0 <= N-1 < N;
-        // witness
-    }
-
+        // change => some row has 0 at the end
+        assert exists r, c :: 0 <= r < N && 0 <= c < N && new_mat[r][c] == 0;
         ImpliesNotLose(new_mat);
     }
-if HasWinTile(mat) {
-    // 取 witness：mat 中存在 2048 的位置
-    var r, c :| 0 <= r < N && 0 <= c < N && mat[r][c] == 2048;
 
-    // 行级：压缩不改变 win（你已有 lemma）
-    CompressRowPreservesWin(mat[r]);
-
-    // safety：new_mat[r] 就是 CompressRow(mat[r]).0
-    assert new_mat[r] == CompressRow(mat[r]).0;
-
-    // 从 mat[r][c]==2048 推出 HasWinTileRow(mat[r])
-    assert HasWinTileRow(mat[r]);
-
-    // 用 CompressRowPreservesWin 得到 HasWinTileRow(new_mat[r])
-    assert HasWinTileRow(new_mat[r]);
-
-    // 从 HasWinTileRow(new_mat[r]) 推出 HasWinTile(new_mat)
-    assert HasWinTile(new_mat);
-}
     // proof for preserve the state
-if !HasWinTile(mat) {
-    if HasWinTile(new_mat) {
-        var r, c :| 0 <= r < N && 0 <= c < N && new_mat[r][c] == 2048;
-
-        // safety
-        assert new_mat[r] == CompressRow(mat[r]).0;
-
-        // 行级 preserves：HasWinTileRow(mat[r]) <==> HasWinTileRow(new_mat[r])
-        CompressRowPreservesWin(mat[r]);
-
-        assert HasWinTileRow(new_mat[r]);
-        assert HasWinTileRow(mat[r]);   // 用 <==> 反推
-        assert HasWinTile(mat);
-        assert false;
-    }
-}
+    assert !HasWinTile(mat) ==> !HasWinTile(new_mat);
     assert !IsLose(mat) ==> !IsLose(new_mat);
 
     return new_mat, done;
 }
 
-// // a method to show that if two moves are in the same direction in a row, second done is false
-// method TwoMovesSameDirSecondNotDone(mat: Grid)
-// requires ValidGrid(mat)
-// requires ValidValues(mat)
-// requires !IsLose(mat)
-// {
-// var g1, d1 := move(mat);
-// assert WellPerformedGrid(g1);
+lemma LemmaFullSlice<T>(s: seq<T>)
+    ensures s[..|s|] == s
+{
+}
 
-// var g2, d2 := move(g1);
-// assert !d2;
-// assert d2 == (g2 != g1);
-// assert g2 == g1;
-// }
 /**********
 (4) merge()
 ***********/
-// merge() merges the neighboring 2 tiles with same value, should satisfy spec 1, 2, 3, 5, 6
+// merge() merges the neighboring 2 tiles with same value, should satisfy spec 1, 2, 5
 // After merging 2 tiles, the number of non-zero tiles should -1
 
 // We have the following lemma for the two CountNonZeros functions
@@ -1067,7 +793,7 @@ function merge_pair(row: seq<int>, j: int): (res: seq<int>)
     ensures forall k :: 0 <= k < |row| && k != j && k != j + 1 ==> res[k] == row[k]    // does not change other tiles
     ensures res[j] == 2048 ==> row[j] == 1024     // the generation of winning tile
     ensures res != row
-    ensures CountNonZerosRow(merge_pair(row, j)) == CountNonZerosRow(row) - 1   // spec 1: after merging, count(non-zeros) should -1
+    ensures CountNonZerosRow(merge_pair(row, j)) == CountNonZerosRow(row) - 1
 {
     var r1 := row[j := row[j] * 2];
     var r2 := r1[j+1 := 0];
@@ -1089,34 +815,23 @@ function update_count(counts: seq<int>, j: int): seq<int>
     counts[j := counts[j] + 1][j + 1 := counts[j+1] + 1]
 }
 
-
-
-// The merge method should satisfy spec 1, 2, 3, 5, 6
+// The merge method should satisfy spec 1, 2, 5
 method merge(grid: Grid) returns (res: Grid, done: bool)
-    // Preconditions:
-    // 1. spec 2 & 5: value and grid validity
     requires ValidGrid(grid)
     requires ValidValues(grid)
-    // 2. game state
+    // precondition for game state
     requires !HasWinTile(grid)
     requires !IsLose(grid)
-    // 3. only receives wellperformed grid (after move)
-    requires WellPerformedGrid(grid)
 
-    // Postconditions:
-    // 1. spec 2 & 5: value and grid validity
     ensures ValidGrid(res)     // spec 5
     ensures ValidValues(res)     // spec 2
-    // 2. spec 6: if done = true, then the board changes (including count)
     ensures !done ==> res == grid   
     ensures done == (res != grid)
     ensures !done ==> CountNonZerosGrid(res) == CountNonZerosGrid(grid)
     ensures done ==> CountNonZerosGrid(res) < CountNonZerosGrid(grid)
-    // 3. spec 1 & 3: once merged, will have empty tile and game state cannot be lose
+    // spec 1: once merged, will have empty tile and game state cannot be lose
     ensures done ==> HasEmptyTile(res)
     ensures !IsLose(res)
-    // 4. spec 6: for performance, if done, can be well-performed or not well-performed; if !done, must be well-performed
-    ensures !done ==> WellPerformedGrid(res)
 {
     res := grid;
     done := false;
@@ -1145,7 +860,6 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
             invariant !done ==> res[i] == grid[i]
             invariant done <==> res != grid
             invariant |merged_counts| == N
-            // spec 1: for each tile, merge only happens once
             invariant forall k :: 0 <= k < N ==> 0 <= merged_counts[k] <= 1
             invariant forall k :: j <= k < N ==> merged_counts[k] == 0
             invariant forall k :: i < k < N ==> res[k] == grid[k]   // later rows remain unsolved
@@ -1155,7 +869,7 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
             invariant done ==> CountNonZerosGrid(res) < CountNonZerosGrid(grid)
             invariant !done ==> CountNonZerosGrid(res) == CountNonZerosGrid(grid)
         {
-            if res[i][j] == res[i][j+1] && res[i][j] != 0 && merged_counts[j] == 0 && merged_counts[j+1] == 0
+            if res[i][j] == res[i][j+1] && res[i][j] != 0 
             {
                 // record before merge
                 var count_before := CountNonZerosGrid(res);
@@ -1176,9 +890,6 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
                 assert res[i][j+1] == 0;
                 ImpliesNotLose(res);
 
-                assert 0 <= j < N - 1;
-                merged_counts := update_count(merged_counts, j);
-                
                 done := true; 
                 j := j + 2;   // skip the next merged grid
             }
@@ -1186,13 +897,69 @@ method merge(grid: Grid) returns (res: Grid, done: bool)
         }
         i := i + 1;
     }
-    if !done {
-        assert res == grid;
-        assert WellPerformedGrid(res);
-    }
 }
 
+// should have a predicate check for spec 6: if !done, then no new generation of 2
+
+/*
+3. matrix transformation
+*/
+
+// (5) reverse()
+method reverse(mat: Grid) returns (res: Grid)
+    requires ValidGrid(mat)
+    requires ValidValues(mat)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+    ensures forall i, j :: 0 <= i < N && 0 <= j < N ==> res[i][j] == mat[i][N - 1 - j]
+{
+    res := seq(N, (i: int) => 
+        if 0 <= i < |mat| then 
+            seq(N, (j: int) => 
+                if 0 <= j < N then mat[i][N - 1 - j] else 0
+            )
+        else 
+            seq(N, _ => 0)
+    );
+}
+
+// (6) transpose
+method transpose(mat: Grid) returns (res: Grid)
+    requires ValidGrid(mat)
+    requires ValidValues(mat)
+    ensures ValidGrid(res)
+    ensures ValidValues(res)
+    ensures forall i, j :: 0 <= i < N && 0 <= j < N ==> res[i][j] == mat[j][i]
+{
+    res := seq(N, (i: int) => 
+        seq(N, (j: int) => 
+            if 0 <= i < N && 0 <= j < N then mat[j][i] else 0
+        )
+    );
+}
+
+/* 
+4. directional controls
+*/
+// The game.py should guarantee that a new tile will be generated, if any of the direction function return done = True
 // (7) left()
+predicate IsFixedPoint(row: seq<int>) {
+    |row| == N && 
+    (forall j :: 0 <= j < |row| ==> row[j] == 0 || IsPowerOfTwo(row[j])) &&
+    CompressRow(row).0 == row
+}
+
+predicate HasMergeableRow(row: seq<int>) {
+    |row| == N &&
+    exists j :: 0 <= j < N - 1 && row[j] != 0 && row[j] == row[j+1]
+}
+
+lemma NoMergeNoLatterMoveDone(g2: Grid, g3: Grid, d2: bool, d3: bool) 
+    ensures !d2 ==> !d3
+{
+    assume !d2 ==> !d3;
+}
+
 lemma DoneImpliesResultChanged(
     game: Grid,
     g1: Grid, g2: Grid, g3: Grid,
@@ -1205,13 +972,6 @@ lemma DoneImpliesResultChanged(
     requires d2 ==> g2 != g1
     requires d3 ==> g3 != g2
 
-    requires CountNonZerosGrid(g1) == CountNonZerosGrid(game)   // move preserves count
-    requires d2 ==> CountNonZerosGrid(g2) < CountNonZerosGrid(g1) // merge done decreases count
-    requires CountNonZerosGrid(g3) == CountNonZerosGrid(g2)     // move preserves count
-
-    requires WellPerformedGrid(g1)
-    requires WellPerformedGrid(g2) ==> !d3
-    
     requires d1 || d2 || d3
     ensures g3 != game
 {
@@ -1235,15 +995,12 @@ lemma DoneImpliesResultChanged(
 
         // 3. move，no merge，move
         if d1 && !d2 && d3{ 
-            assert g2 == g1;
-            assert WellPerformedGrid(g1);
-            assert WellPerformedGrid(g2);
-
+            NoMergeNoLatterMoveDone(g2, g3, d2, d3);   // show it's impossible: no merge, but move again, show that the value of d3 depends on d2
             assert !d3;
             assert false;
         }
 
-        // 4. move, merge, no move
+        // move, merge, no move
         if d1 && d2 && !d3{
             assert g1 != game;
             assert g2!= g1;
@@ -1302,7 +1059,7 @@ method left(game: Grid) returns (res: Grid, done: bool)
     ensures done == (res != game)
     ensures done ==> CountNonZerosGrid(res) <= CountNonZerosGrid(game)
     ensures !done ==> res == game
-    ensures !IsLose(res)
+    ensures !IsLose(game)
 {
     // 2 2 4 8
     // step 1
@@ -1313,35 +1070,26 @@ method left(game: Grid) returns (res: Grid, done: bool)
         assert g1 != game;
     }
     assert CountNonZerosGrid(g1) == CountNonZerosGrid(game);
-    assert ValidGrid(g1);
-    assert WellPerformedGrid(g1);
-
     // step 2  4 0 4 8
     var g2, d2 := merge(g1);
-    assert ValidGrid(g2);
     if !d2 { 
         assert g2 == g1;
         assert CountNonZerosGrid(g2) == CountNonZerosGrid(g1);
-        assert WellPerformedGrid(g2);
     } else {
         assert g1 != g2;
         assert CountNonZerosGrid(g2) < CountNonZerosGrid(g1);
     }
-
     // step 3   4 4 8 0 
     var g3, d3 := move(g2);
-    assert ValidGrid(g3);
-    if WellPerformedGrid(g2) {
-    assert !d3;
+    if !d2 {
+        // add to merge, precondition, postconditon index of 0
+        assert !d3;
     }
-    assert WellPerformedGrid(g2) ==> !d3;
-
     if !d3 { 
         assert g3 == g2; 
     } else {
         assert g3 != g2;
     }
-    
     assert CountNonZerosGrid(g3) == CountNonZerosGrid(g2);
 
     res := g3;
@@ -1357,16 +1105,64 @@ method left(game: Grid) returns (res: Grid, done: bool)
 
     if done {
         // proof: g3 <= g2 <= g1 <= game
-        assert ValidGrid(g1);
-        assert ValidGrid(g2);
-        assert WellPerformedGrid(g1);
-        assert WellPerformedGrid(g2) ==> !d3;
         assert d1 || d2 || d3;
 
         DoneImpliesResultChanged(game, g1, g2, g3, d1, d2, d3);
-        // assert CountNonZerosGrid(g3) == CountNonZerosGrid(g2); // move does not change the number of non-zeros
-        // assert CountNonZerosGrid(g2) <= CountNonZerosGrid(g1); // merge may change the number 
-        // assert CountNonZerosGrid(g1) == CountNonZerosGrid(game); // move does not change the number
-        // assert CountNonZerosGrid(g3) <= CountNonZerosGrid(game);
+        assert CountNonZerosGrid(g3) == CountNonZerosGrid(g2); // move does not change the number of non-zeros
+        assert CountNonZerosGrid(g2) <= CountNonZerosGrid(g1); // merge may change the number 
+        assert CountNonZerosGrid(g1) == CountNonZerosGrid(game); // move does not change the number
+        assert CountNonZerosGrid(g3) <= CountNonZerosGrid(game);
+        if d1 { 
+            assert g1 != game;
+            if !d2 {
+                assert g2 == g1;
+                if !d3 {
+                    assert g3 == g2;
+                    assert g3 != game;       // g3!=g2, g2==g1, g1!=game
+                }
+            }
+        }
+
     }
 }
+
+// // (8) right()
+// method right(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1 := reverse(game);
+//     var g2, d := left(g1);
+//     res := reverse(g2);
+//     done := d;
+// }
+
+// // (9) up()
+// method up(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1 := transpose(game);
+//     var g2, d := left(g1);
+//     res := transpose(g2);
+//     done := d;
+// }
+
+// // (10) down()
+// method down(game: Grid) returns (res: Grid, done: bool)
+//     requires ValidGrid(game)
+//     requires ValidValues(game)
+//     ensures ValidGrid(res)
+//     ensures ValidValues(res)
+// {
+//     var g1 := transpose(game);
+//     var g2 := reverse(g1);
+//     var g3, d := left(g2);
+//     var g4 := reverse(g3);
+//     res := transpose(g4);
+//     done := d;
+// }

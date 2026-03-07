@@ -1,0 +1,20 @@
+file_format_version = "1.0"
+dafny_version = "4.11.0.0"
+[options_by_module.Setups]
+legacy-module-names = false
+rust-sync = false
+[options_by_module.Init]
+legacy-module-names = false
+rust-sync = false
+[options_by_module.Move]
+legacy-module-names = false
+rust-sync = false
+[options_by_module.Merge]
+legacy-module-names = false
+rust-sync = false
+[options_by_module.DirectionControls]
+legacy-module-names = false
+rust-sync = false
+[options_by_module.Logic]
+legacy-module-names = false
+rust-sync = false

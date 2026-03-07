@@ -45,6 +45,19 @@ module Merge {
         counts[j := counts[j] + 1][j + 1 := counts[j+1] + 1]
     }
 
+    // two predicates for ensuring merge starts at the most left
+    predicate MergeableAt(row: seq<int>, j: int)
+    {
+        0 <= j < |row| - 1 &&
+        row[j] != 0 &&
+        row[j] == row[j+1]
+    }
+
+    predicate NoMergeableBefore(row: seq<int>, j: int)
+    {
+        forall k :: 0 <= k < j ==> !MergeableAt(row, k)
+    }
+
     // The merge method should satisfy spec 1, 2, 3, 5, 6
     method merge(grid: Grid) returns (res: Grid, done: bool)
         // Preconditions:
@@ -71,6 +84,13 @@ module Merge {
         ensures !IsLose(res)
         // 4. spec 6: for performance, if done, can be well-performed or not well-performed; if !done, must be well-performed
         ensures !done ==> WellPerformedGrid(res)
+        // 5. spec 1: ensure merge starts from the most left
+        ensures forall i :: 0 <= i < N ==>
+            res[i] != grid[i] ==>
+                exists j :: MergeableAt(grid[i], j) &&
+                        NoMergeableBefore(grid[i], j) &&
+                        res[i][j] == grid[i][j] * 2 &&
+                        res[i][j+1] == 0
     {
         res := grid;
         done := false;
@@ -87,9 +107,17 @@ module Merge {
             invariant !IsLose(res)
             invariant done ==> CountNonZerosGrid(res) < CountNonZerosGrid(grid)
             invariant !done ==> CountNonZerosGrid(res) == CountNonZerosGrid(grid)
+            // left most merge
+            invariant forall r :: 0 <= r < i ==>
+                res[r] != grid[r] ==>
+                    exists j :: MergeableAt(grid[r], j) &&
+                            NoMergeableBefore(grid[r], j) &&
+                            res[r][j] == grid[r][j] * 2 &&
+                            res[r][j+1] == 0
         {
             var j := 0;   // reset j
             var merged_counts := seq(N, _ => 0);   // initialize the merge count for current row
+            var first_merge_j := -1;   // initialize the leftest mergable index
 
             while j < N - 1
                 invariant 0 <= j <= N
@@ -108,9 +136,29 @@ module Merge {
                 invariant !IsLose(res)
                 invariant done ==> CountNonZerosGrid(res) < CountNonZerosGrid(grid)
                 invariant !done ==> CountNonZerosGrid(res) == CountNonZerosGrid(grid)
+                // spec 1: left most merge
+                invariant -1 <= first_merge_j < N
+                invariant first_merge_j == -1 ==> res[i] == grid[i]
+                invariant first_merge_j == -1 ==> forall k :: 0 <= k < j ==> !MergeableAt(grid[i], k)
+                invariant 0 <= first_merge_j ==> MergeableAt(grid[i], first_merge_j)
+                invariant 0 <= first_merge_j ==> NoMergeableBefore(grid[i], first_merge_j)
+                invariant 0 <= first_merge_j ==> res[i][first_merge_j] == grid[i][first_merge_j] * 2
+                invariant 0 <= first_merge_j ==> res[i][first_merge_j+1] == 0
+                invariant 0 <= first_merge_j ==> first_merge_j + 1 < j
+                invariant 0 <= first_merge_j ==> merged_counts[first_merge_j] == 1 && merged_counts[first_merge_j+1] == 1
+                invariant forall r :: 0 <= r < i ==>
+                    res[r] != grid[r] ==>
+                        exists j :: MergeableAt(grid[r], j) &&
+                                    NoMergeableBefore(grid[r], j) &&
+                                    res[r][j] == grid[r][j] * 2 &&
+                                    res[r][j+1] == 0
             {
                 if res[i][j] == res[i][j+1] && res[i][j] != 0 && merged_counts[j] == 0 && merged_counts[j+1] == 0
                 {
+                    if first_merge_j == -1 {
+                        first_merge_j := j;
+                    }
+
                     // record before merge
                     var count_before := CountNonZerosGrid(res);
                     var val_before_merge := res[i][j+1]; 
@@ -129,7 +177,7 @@ module Merge {
                     // proof for !IsLose
                     assert res[i][j+1] == 0;
                     ImpliesNotLose(res);
-
+                    // update merged_counts
                     assert 0 <= j < N - 1;
                     merged_counts := update_count(merged_counts, j);
                     
