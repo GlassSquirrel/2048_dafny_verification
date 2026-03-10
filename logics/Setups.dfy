@@ -348,8 +348,8 @@ module Setups {
                         oldGrid[i][j] == 0 &&
                         newGrid[i][j] == 2 &&
                         (forall r, c ::
-                            0 <= r < N && 0 <= c < N &&
-                            (r != i || c != j) ==> newGrid[r][c] == oldGrid[r][c]
+                            (0 <= r < N && 0 <= c < N && (r != i || c != j))
+                             ==> newGrid[r][c] == oldGrid[r][c]
                         )
                 )
             )
@@ -368,8 +368,8 @@ module Setups {
                         oldGrid[i][j] == 0 &&
                         newGrid[i][j] == 2 &&
                         (forall r, c ::
-                            0 <= r < N && 0 <= c < N &&
-                            (r != i || c != j) ==> newGrid[r][c] == oldGrid[r][c]
+                            (0 <= r < N && 0 <= c < N && (r != i || c != j))
+                             ==> newGrid[r][c] == oldGrid[r][c]
                         )
                 )
             );
