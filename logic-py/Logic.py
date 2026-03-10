@@ -10,6 +10,7 @@ import Setups as Setups
 import Init as Init
 import Move as Move
 import Merge as Merge
+import Transform as Transform
 import DirectionControls as DirectionControls
 
 # Module: Logic
@@ -49,6 +50,39 @@ class default__:
         out0_: _dafny.Seq
         out1_: bool
         out0_, out1_ = DirectionControls.default__.left(grid)
+        res = out0_
+        done = out1_
+        return res, done
+
+    @staticmethod
+    def right__wrapper(grid):
+        res: _dafny.Seq = _dafny.Seq({})
+        done: bool = False
+        out0_: _dafny.Seq
+        out1_: bool
+        out0_, out1_ = DirectionControls.default__.right(grid)
+        res = out0_
+        done = out1_
+        return res, done
+
+    @staticmethod
+    def up__wrapper(grid):
+        res: _dafny.Seq = _dafny.Seq({})
+        done: bool = False
+        out0_: _dafny.Seq
+        out1_: bool
+        out0_, out1_ = DirectionControls.default__.up(grid)
+        res = out0_
+        done = out1_
+        return res, done
+
+    @staticmethod
+    def down__wrapper(grid):
+        res: _dafny.Seq = _dafny.Seq({})
+        done: bool = False
+        out0_: _dafny.Seq
+        out1_: bool
+        out0_, out1_ = DirectionControls.default__.down(grid)
         res = out0_
         done = out1_
         return res, done

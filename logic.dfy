@@ -2,6 +2,7 @@ include "logics/Setups.dfy"
 include "logics/Init_State.dfy"
 include "logics/Move.dfy"
 include "logics/Merge.dfy"
+include "logics/Transform.dfy"
 include "logics/Directions.dfy"
 
 module Logic {
@@ -9,6 +10,7 @@ module Logic {
     import opened Init
     import opened Move
     import opened Merge
+    import opened Transform
     import opened DirectionControls
 
     method new_game_wrapper() returns (g: Grid)

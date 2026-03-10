@@ -1,6 +1,6 @@
 import os
 import sys
-# 把logic-py加到sys.path
+# add logic-py to sys.path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(BASE_DIR, "logic-py"))
 
@@ -60,18 +60,18 @@ class GameGrid(Frame):
         self.master.bind("<Key>", self.key_down)
 
         self.commands = {
-            # c.KEY_UP: Logic.default__.up__wrapper,
-            # c.KEY_DOWN: Logic.default__.down__wrapper,
+            c.KEY_UP: Logic.default__.up__wrapper,
+            c.KEY_DOWN: Logic.default__.down__wrapper,
             c.KEY_LEFT: Logic.default__.left__wrapper,
-            # c.KEY_RIGHT: Logic.default__.right__wrapper,
-            # c.KEY_UP_ALT1: Logic.default__.up__wrapper,
-            # c.KEY_DOWN_ALT1: Logic.default__.down__wrapper,
+            c.KEY_RIGHT: Logic.default__.right__wrapper,
+            c.KEY_UP_ALT1: Logic.default__.up__wrapper,
+            c.KEY_DOWN_ALT1: Logic.default__.down__wrapper,
             c.KEY_LEFT_ALT1: Logic.default__.left__wrapper,
-            # c.KEY_RIGHT_ALT1: Logic.default__.right__wrapper,
-            # c.KEY_UP_ALT2: Logic.default__.up__wrapper,
-            # c.KEY_DOWN_ALT2: Logic.default__.down__wrapper,
+            c.KEY_RIGHT_ALT1: Logic.default__.right__wrapper,
+            c.KEY_UP_ALT2: Logic.default__.up__wrapper,
+            c.KEY_DOWN_ALT2: Logic.default__.down__wrapper,
             c.KEY_LEFT_ALT2: Logic.default__.left__wrapper,
-            # c.KEY_RIGHT_ALT2: Logic.default__.right__wrapper,
+            c.KEY_RIGHT_ALT2: Logic.default__.right__wrapper,
         }
 
         self.grid_cells = []

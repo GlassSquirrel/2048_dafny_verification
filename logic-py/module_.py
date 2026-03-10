@@ -10,6 +10,7 @@ import Setups as Setups
 import Init as Init
 import Move as Move
 import Merge as Merge
+import Transform as Transform
 import DirectionControls as DirectionControls
 import Logic as Logic
 
