@@ -39,20 +39,32 @@ module Logic {
         res, done := left(grid);
     }
 
-    //   method right_wrapper(grid: Grid) returns (res: Grid, done: bool)
-    //   {
-    //     res, done := right(grid);
-    //   }
+      method right_wrapper(grid: Grid) returns (res: Grid, done: bool)
+        requires ValidGrid(grid)
+        requires ValidValues(grid)
+        requires !HasWinTile(grid)
+        requires !IsLose(grid)
+      {
+        res, done := right(grid);
+      }
 
-    //   method up_wrapper(grid: Grid) returns (res: Grid, done: bool)
-    //   {
-    //     res, done := up(grid);
-    //   }
+      method up_wrapper(grid: Grid) returns (res: Grid, done: bool)
+        requires ValidGrid(grid)
+        requires ValidValues(grid)
+        requires !HasWinTile(grid)
+        requires !IsLose(grid)
+      {
+        res, done := up(grid);
+      }
 
-    //   method down_wrapper(grid: Grid) returns (res: Grid, done: bool)
-    //   {
-    //      res, done := down(grid);
-    //   }
+      method down_wrapper(grid: Grid) returns (res: Grid, done: bool)
+        requires ValidGrid(grid)
+        requires ValidValues(grid)
+        requires !HasWinTile(grid)
+        requires !IsLose(grid)
+      {
+         res, done := down(grid);
+      }
 
     method new_tile_validation_wrapper(oldGrid: Grid, moved: bool, newGrid: Grid) returns (ok: bool)
     {
