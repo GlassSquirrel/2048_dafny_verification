@@ -8,16 +8,16 @@ module Transform {
   // 1. Basic transformations
   // ============================================================
 
-  // Reverse one row: [a,b,c,d] -> [d,c,b,a]
+  // Reverse one row
   function ReverseRow(row: seq<int>): seq<int>
     requires |row| == N
     ensures |ReverseRow(row)| == N
     ensures forall j :: 0 <= j < N ==> ReverseRow(row)[j] == row[N - 1 - j]
   {
-    [row[3], row[2], row[1], row[0]]
+    seq(N, j requires 0 <= j < N => row[N - 1 - j])
   }
 
-  // Reverse every row of the grid (horizontal mirror)
+  // Reverse each row of grid
   function Reverse(grid: Grid): Grid
     requires ValidGrid(grid)
     ensures ValidGrid(Reverse(grid))
@@ -25,15 +25,10 @@ module Transform {
               0 <= i < N && 0 <= j < N ==>
                 Reverse(grid)[i][j] == grid[i][N - 1 - j]
   {
-    [
-      ReverseRow(grid[0]),
-      ReverseRow(grid[1]),
-      ReverseRow(grid[2]),
-      ReverseRow(grid[3])
-    ]
+    seq(N, i requires 0 <= i < N => ReverseRow(grid[i]))
   }
 
-  // Transpose the grid: new[i][j] = old[j][i]
+  // Transpose grid
   function Transpose(grid: Grid): Grid
     requires ValidGrid(grid)
     ensures ValidGrid(Transpose(grid))
@@ -41,19 +36,14 @@ module Transform {
               0 <= i < N && 0 <= j < N ==>
                 Transpose(grid)[i][j] == grid[j][i]
   {
-    [
-      [grid[0][0], grid[1][0], grid[2][0], grid[3][0]],
-      [grid[0][1], grid[1][1], grid[2][1], grid[3][1]],
-      [grid[0][2], grid[1][2], grid[2][2], grid[3][2]],
-      [grid[0][3], grid[1][3], grid[2][3], grid[3][3]]
-    ]
+    seq(N, i requires 0 <= i < N =>
+      seq(N, j requires 0 <= j < N => grid[j][i]))
   }
 
   // ============================================================
   // 2. Property-preservation lemmas
   // ============================================================
 
-  // Reverse preserves valid tile values
   lemma ReversePreservesValues(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -67,7 +57,6 @@ module Transform {
     }
   }
 
-  // Transpose preserves valid tile values
   lemma TransposePreservesValues(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -80,7 +69,6 @@ module Transform {
     }
   }
 
-  // Reverse preserves existence of a 2048 tile
   lemma ReversePreservesWin(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -101,7 +89,6 @@ module Transform {
     }
   }
 
-  // Transpose preserves existence of a 2048 tile
   lemma TransposePreservesWin(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -121,7 +108,6 @@ module Transform {
     }
   }
 
-  // Reverse preserves existence of empty tiles
   lemma ReversePreservesEmpty(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -142,7 +128,6 @@ module Transform {
     }
   }
 
-  // Transpose preserves existence of empty tiles
   lemma TransposePreservesEmpty(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -162,126 +147,173 @@ module Transform {
     }
   }
 
-  // Reverse preserves whether a merge is still possible
-  lemma ReversePreservesMoreToMerge(grid: Grid)
-    requires ValidGrid(grid)
-    requires ValidValues(grid)
-    ensures MoreToMerge(grid) == MoreToMerge(Reverse(grid))
-  {
-    if MoreToMerge(grid) {
-      if exists i, j :: 0 <= i < N && 0 <= j < N - 1 && grid[i][j] == grid[i][j + 1] {
-        var i, j :| 0 <= i < N && 0 <= j < N - 1 && grid[i][j] == grid[i][j + 1];
-        assert 0 <= N - 2 - j < N - 1;
-        assert Reverse(grid)[i][N - 2 - j] == grid[i][j + 1];
-        assert Reverse(grid)[i][N - 1 - j] == grid[i][j];
-        assert exists ii, jj ::
-            0 <= ii < N && 0 <= jj < N - 1 &&
-            Reverse(grid)[ii][jj] == Reverse(grid)[ii][jj + 1];
-      } else {
-        var i, j :| 0 <= i < N - 1 && 0 <= j < N && grid[i][j] == grid[i + 1][j];
-        // var i, j :| {:trigger grid[i][j], grid[i+1][j]}
-        //   0 <= i < N - 1 && 0 <= j < N &&
-        //   grid[i][j] == grid[i + 1][j];
-        assert Reverse(grid)[i][N - 1 - j] == grid[i][j];
-        assert Reverse(grid)[i + 1][N - 1 - j] == grid[i + 1][j];
-        assert exists ii, jj {:trigger Reverse(grid)[ii][jj]} ::
-            0 <= ii < N - 1 && 0 <= jj < N &&
-            Reverse(grid)[ii][jj] == Reverse(grid)[ii + 1][jj];
-      }
-    }
+lemma ReversePreservesMoreToMerge(grid: Grid)
+  requires ValidGrid(grid)
+  requires ValidValues(grid)
+  ensures MoreToMerge(grid) == MoreToMerge(Reverse(grid))
+{
+  // grid -> Reverse(grid)
+  if MoreToMerge(grid) {
+    if exists i, j ::
+        0 <= i < N && 0 <= j < N - 1 &&
+        grid[i][j] == grid[i][j + 1]
+    {
+      var i, j :|
+        0 <= i < N && 0 <= j < N - 1 &&
+        grid[i][j] == grid[i][j + 1];
 
-    if MoreToMerge(Reverse(grid)) {
-      if exists i, j :: 0 <= i < N && 0 <= j < N - 1 && Reverse(grid)[i][j] == Reverse(grid)[i][j + 1] {
-        var i, j :| 0 <= i < N && 0 <= j < N - 1 && Reverse(grid)[i][j] == Reverse(grid)[i][j + 1];
-        assert Reverse(grid)[i][j] == grid[i][N - 1 - j];
-        assert Reverse(grid)[i][j + 1] == grid[i][N - 2 - j];
-        assert exists ii, jj ::
-            0 <= ii < N && 0 <= jj < N - 1 &&
-            grid[ii][jj] == grid[ii][jj + 1];
-      } else {
-        var i, j :| 0 <= i < N - 1 && 0 <= j < N && Reverse(grid)[i][j] == Reverse(grid)[i + 1][j];
-        assert Reverse(grid)[i][j] == grid[i][N - 1 - j];
-        assert Reverse(grid)[i + 1][j] == grid[i + 1][N - 1 - j];
-        assert exists ii, jj {:trigger Reverse(grid)[ii][jj]}::
-            0 <= ii < N - 1 && 0 <= jj < N &&
-            grid[ii][jj] == grid[ii + 1][jj];
-      }
+      assert 0 <= N - 2 - j < N - 1;
+      assert Reverse(grid)[i][N - 2 - j] == grid[i][j + 1];
+      assert Reverse(grid)[i][N - 1 - j] == grid[i][j];
+
+      assert exists ii, jj ::
+          ii == i &&
+          jj == N - 2 - j &&
+          0 <= ii < N &&
+          0 <= jj < N - 1 &&
+          Reverse(grid)[ii][jj] == Reverse(grid)[ii][jj + 1];
+    } else {
+      assert exists i, j {:trigger grid[i][j], grid[i + 1][j]} ::
+          0 <= i < N - 1 && 0 <= j < N &&
+          grid[i][j] == grid[i + 1][j];
+
+      var i, j :| 0 <= i < N - 1 && 0 <= j < N && grid[i][j] == grid[i + 1][j];
+
+      assert 0 <= N - 1 - j < N;
+      assert Reverse(grid)[i][N - 1 - j] == grid[i][j];
+      assert Reverse(grid)[i + 1][N - 1 - j] == grid[i + 1][j];
+
+      assert exists ii, jj {:trigger Reverse(grid)[ii][jj], Reverse(grid)[ii + 1][jj]} ::
+          ii == i &&
+          jj == N - 1 - j &&
+          0 <= ii < N - 1 &&
+          0 <= jj < N &&
+          Reverse(grid)[ii][jj] == Reverse(grid)[ii + 1][jj];
     }
   }
+
+  // Reverse(grid) -> grid
+  if MoreToMerge(Reverse(grid)) {
+    if exists i, j ::
+        0 <= i < N && 0 <= j < N - 1 &&
+        Reverse(grid)[i][j] == Reverse(grid)[i][j + 1]
+    {
+      var i, j :|
+        0 <= i < N && 0 <= j < N - 1 &&
+        Reverse(grid)[i][j] == Reverse(grid)[i][j + 1];
+
+      assert 0 <= N - 2 - j < N - 1;
+      assert Reverse(grid)[i][j] == grid[i][N - 1 - j];
+      assert Reverse(grid)[i][j + 1] == grid[i][N - 2 - j];
+
+      assert exists ii, jj ::
+          ii == i &&
+          jj == N - 2 - j &&
+          0 <= ii < N &&
+          0 <= jj < N - 1 &&
+          grid[ii][jj] == grid[ii][jj + 1];
+    } else {
+      assert exists i, j {:trigger Reverse(grid)[i][j], Reverse(grid)[i + 1][j]} ::
+          0 <= i < N - 1 && 0 <= j < N &&
+          Reverse(grid)[i][j] == Reverse(grid)[i + 1][j];
+
+      var i, j :| 0 <= i < N - 1 && 0 <= j < N && Reverse(grid)[i][j] == Reverse(grid)[i + 1][j];
+
+      assert 0 <= N - 1 - j < N;
+      assert Reverse(grid)[i][j] == grid[i][N - 1 - j];
+      assert Reverse(grid)[i + 1][j] == grid[i + 1][N - 1 - j];
+
+      assert exists ii, jj {:trigger grid[ii][jj], grid[ii + 1][jj]} ::
+          ii == i &&
+          jj == N - 1 - j &&
+          0 <= ii < N - 1 &&
+          0 <= jj < N &&
+          grid[ii][jj] == grid[ii + 1][jj];
+    }
+  }
+}
 
   lemma TransposePreservesMoreToMerge(grid: Grid)
-    requires ValidGrid(grid)
-    requires ValidValues(grid)
-    ensures MoreToMerge(grid) == MoreToMerge(Transpose(grid))
-  {
-    // direction 1: grid -> transpose(grid)
-    if MoreToMerge(grid) {
-      if exists i, j :: 0 <= i < N && 0 <= j < N - 1 && grid[i][j] == grid[i][j + 1] {
-        var i, j :| 0 <= i < N && 0 <= j < N - 1 && grid[i][j] == grid[i][j + 1];
+  requires ValidGrid(grid)
+  requires ValidValues(grid)
+  ensures MoreToMerge(grid) == MoreToMerge(Transpose(grid))
+{
+  // grid -> Transpose(grid)
+  if MoreToMerge(grid) {
+    if exists i, j ::
+        0 <= i < N && 0 <= j < N - 1 &&
+        grid[i][j] == grid[i][j + 1]
+    {
+      var i, j :|
+        0 <= i < N && 0 <= j < N - 1 &&
+        grid[i][j] == grid[i][j + 1];
 
-        assert Transpose(grid)[j][i] == grid[i][j];
-        assert Transpose(grid)[j + 1][i] == grid[i][j + 1];
+      assert Transpose(grid)[j][i] == grid[i][j];
+      assert Transpose(grid)[j + 1][i] == grid[i][j + 1];
 
-        // witness: (ii, jj) = (j, i)
-        assert exists ii, jj {:trigger Transpose(grid)[ii][jj], Transpose(grid)[ii + 1][jj]}::
-            ii == j &&
-            jj == i &&
-            0 <= ii < N - 1 &&
-            0 <= jj < N &&
-            Transpose(grid)[ii][jj] == Transpose(grid)[ii + 1][jj];
-      } else {
-        var i, j :| 0 <= i < N - 1 && 0 <= j < N && grid[i][j] == grid[i + 1][j];
+      assert exists ii, jj {:trigger Transpose(grid)[ii][jj], Transpose(grid)[ii + 1][jj]} ::
+          ii == j &&
+          jj == i &&
+          0 <= ii < N - 1 &&
+          0 <= jj < N &&
+          Transpose(grid)[ii][jj] == Transpose(grid)[ii + 1][jj];
+    } else {
+      assert exists i, j {:trigger grid[i][j], grid[i + 1][j]} ::
+          0 <= i < N - 1 && 0 <= j < N &&
+          grid[i][j] == grid[i + 1][j];
 
-        assert Transpose(grid)[j][i] == grid[i][j];
-        assert Transpose(grid)[j][i + 1] == grid[i + 1][j];
+      var i, j :| 0 <= i < N - 1 && 0 <= j < N && grid[i][j] == grid[i + 1][j];
 
-        // witness: (ii, jj) = (j, i)
-        assert exists ii, jj ::
-            ii == j &&
-            jj == i &&
-            0 <= ii < N &&
-            0 <= jj < N - 1 &&
-            Transpose(grid)[ii][jj] == Transpose(grid)[ii][jj + 1];
-      }
-    }
+      assert Transpose(grid)[j][i] == grid[i][j];
+      assert Transpose(grid)[j][i + 1] == grid[i + 1][j];
 
-    // direction 2: transpose(grid) -> grid
-    if MoreToMerge(Transpose(grid)) {
-      if exists i, j ::
-          0 <= i < N && 0 <= j < N - 1 &&
-          Transpose(grid)[i][j] == Transpose(grid)[i][j + 1] {
-
-        var i, j :| 0 <= i < N && 0 <= j < N - 1 &&
-                    Transpose(grid)[i][j] == Transpose(grid)[i][j + 1];
-
-        assert Transpose(grid)[i][j] == grid[j][i];
-        assert Transpose(grid)[i][j + 1] == grid[j + 1][i];
-
-        // witness: (ii, jj) = (j, i)
-        assert exists ii, jj {:trigger grid[ii][jj], grid[ii + 1][jj]}::
-            ii == j &&
-            jj == i &&
-            0 <= ii < N - 1 &&
-            0 <= jj < N &&
-            grid[ii][jj] == grid[ii + 1][jj];
-      } else {
-        var i, j :| 0 <= i < N - 1 && 0 <= j < N &&
-                    Transpose(grid)[i][j] == Transpose(grid)[i + 1][j];
-
-        assert Transpose(grid)[i][j] == grid[j][i];
-        assert Transpose(grid)[i + 1][j] == grid[j][i + 1];
-
-        // witness: (ii, jj) = (j, i)
-        assert exists ii, jj ::
-            ii == j &&
-            jj == i &&
-            0 <= ii < N &&
-            0 <= jj < N - 1 &&
-            grid[ii][jj] == grid[ii][jj + 1];
-      }
+      assert exists ii, jj ::
+          ii == j &&
+          jj == i &&
+          0 <= ii < N &&
+          0 <= jj < N - 1 &&
+          Transpose(grid)[ii][jj] == Transpose(grid)[ii][jj + 1];
     }
   }
 
+  // Transpose(grid) -> grid
+  if MoreToMerge(Transpose(grid)) {
+    if exists i, j ::
+        0 <= i < N && 0 <= j < N - 1 &&
+        Transpose(grid)[i][j] == Transpose(grid)[i][j + 1]
+    {
+      var i, j :|
+        0 <= i < N && 0 <= j < N - 1 &&
+        Transpose(grid)[i][j] == Transpose(grid)[i][j + 1];
+
+      assert Transpose(grid)[i][j] == grid[j][i];
+      assert Transpose(grid)[i][j + 1] == grid[j + 1][i];
+
+      assert exists ii, jj {:trigger grid[ii][jj], grid[ii + 1][jj]} ::
+          ii == j &&
+          jj == i &&
+          0 <= ii < N - 1 &&
+          0 <= jj < N &&
+          grid[ii][jj] == grid[ii + 1][jj];
+    } else {
+      assert exists i, j {:trigger Transpose(grid)[i][j], Transpose(grid)[i + 1][j]} ::
+          0 <= i < N - 1 && 0 <= j < N &&
+          Transpose(grid)[i][j] == Transpose(grid)[i + 1][j];
+
+      var i, j :| 0 <= i < N - 1 && 0 <= j < N && Transpose(grid)[i][j] == Transpose(grid)[i + 1][j];
+
+      assert Transpose(grid)[i][j] == grid[j][i];
+      assert Transpose(grid)[i + 1][j] == grid[j][i + 1];
+
+      assert exists ii, jj ::
+          ii == j &&
+          jj == i &&
+          0 <= ii < N &&
+          0 <= jj < N - 1 &&
+          grid[ii][jj] == grid[ii][jj + 1];
+    }
+  }
+}
   // ============================================================
   // 3. Combined game-state preservation
   // ============================================================
@@ -314,60 +346,64 @@ module Transform {
     requires |row| == N
     ensures ReverseRow(ReverseRow(row)) == row
   {
-    assert ReverseRow(row) == [row[3], row[2], row[1], row[0]];
-    assert ReverseRow(ReverseRow(row)) ==
-           [ReverseRow(row)[3], ReverseRow(row)[2], ReverseRow(row)[1], ReverseRow(row)[0]];
-    assert ReverseRow(ReverseRow(row)) == [row[0], row[1], row[2], row[3]];
+    assert |ReverseRow(ReverseRow(row))| == N;
+    assert |row| == N;
+
+    forall j | 0 <= j < N
+      ensures ReverseRow(ReverseRow(row))[j] == row[j]
+    {
+      assert 0 <= N - 1 - j < N;
+      assert ReverseRow(ReverseRow(row))[j] == ReverseRow(row)[N - 1 - j];
+      assert ReverseRow(row)[N - 1 - j] == row[N - 1 - (N - 1 - j)];
+      assert N - 1 - (N - 1 - j) == j;
+    }
+
+    assert ReverseRow(ReverseRow(row)) == row;
   }
 
   lemma ReverseInvolution(grid: Grid)
     requires ValidGrid(grid)
     ensures Reverse(Reverse(grid)) == grid
   {
-    ReverseRowInvolution(grid[0]);
-    ReverseRowInvolution(grid[1]);
-    ReverseRowInvolution(grid[2]);
-    ReverseRowInvolution(grid[3]);
+    assert |Reverse(Reverse(grid))| == N;
+    assert |grid| == N;
 
-    assert Reverse(Reverse(grid)) ==
-           [
-             ReverseRow(ReverseRow(grid[0])),
-             ReverseRow(ReverseRow(grid[1])),
-             ReverseRow(ReverseRow(grid[2])),
-             ReverseRow(ReverseRow(grid[3]))
-           ];
+    forall i | 0 <= i < N
+      ensures Reverse(Reverse(grid))[i] == grid[i]
+    {
+      assert Reverse(grid)[i] == ReverseRow(grid[i]);
+      assert Reverse(Reverse(grid))[i] == ReverseRow(Reverse(grid)[i]);
+      assert Reverse(Reverse(grid))[i] == ReverseRow(ReverseRow(grid[i]));
+      ReverseRowInvolution(grid[i]);
+      assert Reverse(Reverse(grid))[i] == grid[i];
+    }
 
-    assert Reverse(Reverse(grid)) == [grid[0], grid[1], grid[2], grid[3]];
+    assert Reverse(Reverse(grid)) == grid;
   }
 
   lemma TransposeInvolution(grid: Grid)
     requires ValidGrid(grid)
     ensures Transpose(Transpose(grid)) == grid
   {
-    assert |grid[0]| == N;
-    assert |grid[1]| == N;
-    assert |grid[2]| == N;
-    assert |grid[3]| == N;
+    assert |Transpose(Transpose(grid))| == N;
+    assert |grid| == N;
 
-    assert Transpose(grid) ==
-           [
-             [grid[0][0], grid[1][0], grid[2][0], grid[3][0]],
-             [grid[0][1], grid[1][1], grid[2][1], grid[3][1]],
-             [grid[0][2], grid[1][2], grid[2][2], grid[3][2]],
-             [grid[0][3], grid[1][3], grid[2][3], grid[3][3]]
-           ];
+    forall i | 0 <= i < N
+      ensures Transpose(Transpose(grid))[i] == grid[i]
+    {
+      assert |Transpose(Transpose(grid))[i]| == N;
+      assert |grid[i]| == N;
 
-    assert Transpose(Transpose(grid)) ==
-           [
-             [grid[0][0], grid[0][1], grid[0][2], grid[0][3]],
-             [grid[1][0], grid[1][1], grid[1][2], grid[1][3]],
-             [grid[2][0], grid[2][1], grid[2][2], grid[2][3]],
-             [grid[3][0], grid[3][1], grid[3][2], grid[3][3]]
-           ];
+      forall j | 0 <= j < N
+        ensures Transpose(Transpose(grid))[i][j] == grid[i][j]
+      {
+        assert Transpose(Transpose(grid))[i][j] == Transpose(grid)[j][i];
+        assert Transpose(grid)[j][i] == grid[i][j];
+      }
 
-    assert [grid[0][0], grid[0][1], grid[0][2], grid[0][3]] == grid[0];
-    assert [grid[1][0], grid[1][1], grid[1][2], grid[1][3]] == grid[1];
-    assert [grid[2][0], grid[2][1], grid[2][2], grid[2][3]] == grid[2];
-    assert [grid[3][0], grid[3][1], grid[3][2], grid[3][3]] == grid[3];
+      assert Transpose(Transpose(grid))[i] == grid[i];
+    }
+
+    assert Transpose(Transpose(grid)) == grid;
   }
 }
