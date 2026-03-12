@@ -102,6 +102,8 @@ module Transform {
   {
   }
 
+// 如果原 grid 中一行有两个相邻且相等的 tile，那么 reverse 之后这一行的相应位置也有两个相邻且相等的 tile
+// 让 Dafny 知道 reverse 不会破坏 adjacency
   lemma ReverseGridAdjacent(grid: Grid, i: int, j: int)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -112,6 +114,7 @@ module Transform {
   {
   }
 
+// 把 exists 变成具体变量
   lemma RemoveExist(grid: Grid) returns (i: int, j: int)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -122,6 +125,7 @@ module Transform {
     i, j := ii, jj;
   }
 
+// 如果我们已经有一个具体 (i,j) 满足条件，reverse 之后我们就知道 (i, N-1-j) 满足条件
   lemma AddExist(grid: Grid, i: int, j: int)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -129,7 +133,7 @@ module Transform {
     ensures exists ii, jj :: twotilesadjacent(ii, jj, grid)
   {
   }
-
+  
   lemma ReversePreservesMoreToMerge(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
