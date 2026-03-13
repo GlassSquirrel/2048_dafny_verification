@@ -86,8 +86,6 @@ python3 game.py
 | → / D / L | Move Right |
 | Esc | Quit |
 
-(Current version supports left movement while other directions are under development.)
-
 ### Python ↔ Dafny Interaction
 The Python GUI interacts with Dafny logic through wrapper functions generated in:
 ```
@@ -97,7 +95,7 @@ Example:
 ```
 left__wrapper(board)
 game__state__wrapper(board)
-new__tile__validation__wrapper(old, moved, new)
+new__tile__validation__wrapper(old_board, changed, new_board)
 ```
 These wrappers ensure that every board state manipulated by the GUI satisfies the verified Dafny specifications.
 
