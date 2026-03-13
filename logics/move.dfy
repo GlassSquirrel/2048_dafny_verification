@@ -8,7 +8,7 @@ module Move {
     (3) move()
     **********/
     // Move should satisfy spec 2, 3, 5, 6
-    // For spec 3: after move(), the game state should not change 
+    // For spec 5: after move(), the game state should not change 
     // First, we will have a new predicate to check if one row has the win tile 2048
     predicate HasWinTileRow(row: seq<int>)
         requires |row| == N
@@ -175,7 +175,7 @@ module Move {
         requires forall j :: 0 <= j < |row| ==> row[j] == 0 || IsPowerOfTwo(row[j])   // all the values in the row is valid
 
         // 1. validation of output
-        ensures |CompressRow(row).0| == N   // spec 5: the length of the output row is still valid
+        ensures |CompressRow(row).0| == N   // spec 3: the length of the output row is still valid
         ensures forall x :: x in CompressRow(row).0 ==> x == 0 || IsPowerOfTwo(x)   // spec 2: the values are valid
         ensures forall x :: x in CompressRow(row).0 ==> x == 0 || x in row   // all the elements should come from the original row, no new elements generated
         // 2. ensure the number of non-zero elements remains the same
@@ -375,13 +375,13 @@ module Move {
         requires ValidGrid(mat)
         requires ValidValues(mat)
         // requires !HasWinTile(mat)
-        requires !IsLose(mat)    // spec 3 precondition: not lose state
+        requires !IsLose(mat)    // spec 5 precondition: not lose state
 
         // Postconditions:
-        // 1. spec 2 & 5
+        // 1. spec 2 & 3
         ensures ValidGrid(new_mat)
         ensures ValidValues(new_mat)    
-        // 2. spec 3: does not change the state of the game
+        // 2. spec 5: does not change the state of the game
         ensures HasWinTile(mat) ==> HasWinTile(new_mat)
         ensures !HasWinTile(mat) ==> !HasWinTile(new_mat)
         ensures !IsLose(new_mat)
@@ -401,14 +401,14 @@ module Move {
             // basic controls: postcondition part 1
             invariant 0 <= i <= N 
             invariant |temp_grid| == i
-            invariant forall k :: 0 <= k < i ==> |temp_grid[k]| == N   // spec 5: make sure the iterated rows lengths are valid
+            invariant forall k :: 0 <= k < i ==> |temp_grid[k]| == N   // spec 3: make sure the iterated rows lengths are valid
             // invariant forall k :: 0 <= k < i ==> forall j :: 0 <= j < N ==> temp_grid[k][j] == 0 || IsPowerOfTwo(temp_grid[k][j])  // spec 2: values are valid
             invariant forall k :: 0 <= k < i ==> forall j :: 0 <= j < N ==> temp_grid[k][j] == 0 || IsPowerOfTwo(temp_grid[k][j])
             // safety: 
             invariant forall k :: 0 <= k < i ==> temp_grid[k] == CompressRow(mat[k]).0   // the iterated rows are the outcome of the corresponding original row
             // make sure state not changed: postcondition part 2
             invariant forall k :: 0 <= k < i ==> (temp_grid[k] != mat[k] ==> done)   // if row moved, then done = True 
-            // invariant (exists k :: 0 <= k < i && HasWinTileRow(temp_grid[k])) <==> (exists k :: 0 <= k < i && HasWinTileRow(mat[k]))   // spec 3: make sure the win state is preserved
+            // invariant (exists k :: 0 <= k < i && HasWinTileRow(temp_grid[k])) <==> (exists k :: 0 <= k < i && HasWinTileRow(mat[k]))   // spec 5: make sure the win state is preserved
             invariant !done ==> temp_grid == mat[..i]   // if no previous rows moved, stay the same
             // invariant done ==> exists k, l :: 0 <= k < i && 0 <= l < N && temp_grid[k][l] == 0    // if previous rows moved, has tile = 0
             invariant done ==> exists k :: 0 <= k < i && CompressRow(mat[k]).1
