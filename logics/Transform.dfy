@@ -90,50 +90,93 @@ module Transform {
     requires ValidValues(grid)
     requires MoreToMerge(grid)
     ensures
-      (exists i, j ::
-         0 <= i < N &&
-         0 <= j < N - 1 &&
-         grid[i][j] == grid[i][j + 1])
+      (exists i, j :: HorizontalPair(i, j, grid))
       ||
-      (exists i, j ::
-         0 <= i < N - 1 &&
-         0 <= j < N &&
-         grid[i][j] == grid[i + 1][j])
+      (exists i, j :: VerticalPair(i, j, grid))
   {
   }
 
-// 如果原 grid 中一行有两个相邻且相等的 tile，那么 reverse 之后这一行的相应位置也有两个相邻且相等的 tile
-// 让 Dafny 知道 reverse 不会破坏 adjacency
-  lemma ReverseGridAdjacent(grid: Grid, i: int, j: int)
+  lemma HorizontalPairReverse(grid: Grid, i: int, j: int)
     requires ValidGrid(grid)
     requires ValidValues(grid)
-    requires 0 <= i < N
-    requires 0 <= j < N-1
-    requires grid[i][j] == grid[i][j+1]
-    ensures Reverse(grid)[i][N-1-j] == Reverse(grid)[i][N-2-j]
+    requires HorizontalPair(i, j, grid)
+    ensures HorizontalPair(i, N - 2 - j, Reverse(grid))
   {
+    assert 0 <= N - 2 - j < N - 1;
+    assert Reverse(grid)[i][N - 2 - j] == grid[i][j + 1];
+    assert Reverse(grid)[i][N - 1 - j] == grid[i][j];
   }
 
-// 把 exists 变成具体变量
-  lemma RemoveExist(grid: Grid) returns (i: int, j: int)
+  lemma VerticalPairReverse(grid: Grid, i: int, j: int)
     requires ValidGrid(grid)
     requires ValidValues(grid)
-    requires exists i, j :: twotilesadjacent(i, j, grid)
-    ensures twotilesadjacent(i, j, grid)
+    requires VerticalPair(i, j, grid)
+    ensures VerticalPair(i, N - 1 - j, Reverse(grid))
   {
-    var ii, jj :| twotilesadjacent(ii, jj, grid);
-    i, j := ii, jj;
+    assert 0 <= N - 1 - j < N;
+    assert Reverse(grid)[i][N - 1 - j] == grid[i][j];
+    assert Reverse(grid)[i + 1][N - 1 - j] == grid[i + 1][j];
   }
 
-// 如果我们已经有一个具体 (i,j) 满足条件，reverse 之后我们就知道 (i, N-1-j) 满足条件
-  lemma AddExist(grid: Grid, i: int, j: int)
+  lemma HorizontalPairReverseBack(grid: Grid, i: int, j: int)
     requires ValidGrid(grid)
     requires ValidValues(grid)
-    requires twotilesadjacent(i, j, grid)
-    ensures exists ii, jj :: twotilesadjacent(ii, jj, grid)
+    requires HorizontalPair(i, j, Reverse(grid))
+    ensures HorizontalPair(i, N - 2 - j, grid)
   {
+    assert 0 <= N - 2 - j < N - 1;
+    assert Reverse(grid)[i][j] == grid[i][N - 1 - j];
+    assert Reverse(grid)[i][j + 1] == grid[i][N - 2 - j];
   }
-  
+
+  lemma VerticalPairReverseBack(grid: Grid, i: int, j: int)
+    requires ValidGrid(grid)
+    requires ValidValues(grid)
+    requires VerticalPair(i, j, Reverse(grid))
+    ensures VerticalPair(i, N - 1 - j, grid)
+  {
+    assert 0 <= N - 1 - j < N;
+    assert Reverse(grid)[i][j] == grid[i][N - 1 - j];
+    assert Reverse(grid)[i + 1][j] == grid[i + 1][N - 1 - j];
+  }
+
+lemma NoHorizontalThenVertical(grid: Grid)
+  requires ValidGrid(grid)
+  requires ValidValues(grid)
+  requires MoreToMerge(grid)
+  requires !(exists i, j | 0 <= i < N && 0 <= j < N - 1 :: HorizontalPair(i, j, grid))
+  ensures exists i, j | 0 <= i < N - 1 && 0 <= j < N :: VerticalPair(i, j, grid)
+{
+  if !(exists i, j | 0 <= i < N - 1 && 0 <= j < N :: VerticalPair(i, j, grid)) {
+    assert !(
+      (exists i, j | 0 <= i < N && 0 <= j < N - 1 :: HorizontalPair(i, j, grid))
+      ||
+      (exists i, j | 0 <= i < N - 1 && 0 <= j < N :: VerticalPair(i, j, grid))
+    );
+    assert false;
+  }
+}
+
+lemma ExistsHorizontalPair(grid: Grid) returns (i: int, j: int)
+  requires ValidGrid(grid)
+  requires ValidValues(grid)
+  requires exists i, j | 0 <= i < N && 0 <= j < N - 1 :: HorizontalPair(i, j, grid)
+  ensures HorizontalPair(i, j, grid)
+{
+  var i1, j1 :| HorizontalPair(i1, j1, grid);
+  i, j := i1, j1;
+}
+
+lemma ExistsVerticalPair(grid: Grid) returns (i: int, j: int)
+  requires ValidGrid(grid)
+  requires ValidValues(grid)
+  requires exists i, j | 0 <= i < N - 1 && 0 <= j < N :: VerticalPair(i, j, grid)
+  ensures VerticalPair(i, j, grid)
+{
+  var i1, j1 :| VerticalPair(i1, j1, grid);
+  i, j := i1, j1;
+}
+
   lemma ReversePreservesMoreToMerge(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -141,82 +184,34 @@ module Transform {
   {
     // grid -> Reverse(grid)
     if MoreToMerge(grid) {
-      if exists i, j ::
-          0 <= i < N && 0 <= j < N - 1 &&
-          grid[i][j] == grid[i][j + 1]
+      EnsuresMoreToMerge(grid);
+      if exists i, j :: HorizontalPair(i, j, grid)
       {
-        var i, j :|
-          0 <= i < N && 0 <= j < N - 1 &&
-          grid[i][j] == grid[i][j + 1];
-
-        assert 0 <= N - 2 - j < N - 1;
-        assert Reverse(grid)[i][N - 2 - j] == grid[i][j + 1];
-        assert Reverse(grid)[i][N - 1 - j] == grid[i][j];
-
-        assert exists ii, jj ::
-            ii == i &&
-            jj == N - 2 - j &&
-            0 <= ii < N &&
-            0 <= jj < N - 1 &&
-            Reverse(grid)[ii][jj] == Reverse(grid)[ii][jj + 1];
+        var i, j := ExistsHorizontalPair(grid);
+        HorizontalPairReverse(grid, i, j);
+        assert exists ii, jj :: HorizontalPair(ii, jj, Reverse(grid));
       } else {
-        assert exists i, j {:trigger grid[i][j], grid[i + 1][j]} ::
-            0 <= i < N - 1 && 0 <= j < N &&
-            grid[i][j] == grid[i + 1][j];
-
-        var i, j :| 0 <= i < N - 1 && 0 <= j < N && grid[i][j] == grid[i + 1][j];
-
-        assert 0 <= N - 1 - j < N;
-        assert Reverse(grid)[i][N - 1 - j] == grid[i][j];
-        assert Reverse(grid)[i + 1][N - 1 - j] == grid[i + 1][j];
-
-        assert exists ii, jj {:trigger Reverse(grid)[ii][jj], Reverse(grid)[ii + 1][jj]} ::
-            ii == i &&
-            jj == N - 1 - j &&
-            0 <= ii < N - 1 &&
-            0 <= jj < N &&
-            Reverse(grid)[ii][jj] == Reverse(grid)[ii + 1][jj];
+        NoHorizontalThenVertical(grid);
+        var i, j := ExistsVerticalPair(grid);
+        VerticalPairReverse(grid, i, j);
+        assert exists ii, jj :: VerticalPair(ii, jj, Reverse(grid));
       }
     }
 
     // Reverse(grid) -> grid
     if MoreToMerge(Reverse(grid)) {
-      if exists i, j ::
-          0 <= i < N && 0 <= j < N - 1 &&
-          Reverse(grid)[i][j] == Reverse(grid)[i][j + 1]
+      ReversePreservesValues(grid);
+      EnsuresMoreToMerge(Reverse(grid));
+      if exists i, j :: HorizontalPair(i, j, Reverse(grid))
       {
-        var i, j :|
-          0 <= i < N && 0 <= j < N - 1 &&
-          Reverse(grid)[i][j] == Reverse(grid)[i][j + 1];
-
-        assert 0 <= N - 2 - j < N - 1;
-        assert Reverse(grid)[i][j] == grid[i][N - 1 - j];
-        assert Reverse(grid)[i][j + 1] == grid[i][N - 2 - j];
-
-        assert exists ii, jj ::
-            ii == i &&
-            jj == N - 2 - j &&
-            0 <= ii < N &&
-            0 <= jj < N - 1 &&
-            grid[ii][jj] == grid[ii][jj + 1];
+        var i, j := ExistsHorizontalPair(Reverse(grid));
+        HorizontalPairReverseBack(grid, i, j);
+        assert exists ii, jj :: HorizontalPair(ii, jj, grid);
       } else {
-        // assert exists i, j {:trigger Reverse(grid)[i][j], Reverse(grid)[i + 1][j]} ::
-        //     0 <= i < N - 1 && 0 <= j < N &&
-        //     Reverse(grid)[i][j] == Reverse(grid)[i + 1][j];
-        // assert exists i, j :: twotilesadjacent(i, j, grid);
-
-        assert exists i, j :: twotilesadjacent(i, j, Reverse(grid));
-        var i, j := ExistsVerticalMerge(Reverse(grid));
-        assert 0 <= N - 1 - j < N;
-        assert Reverse(grid)[i][j] == grid[i][N - 1 - j];
-        assert Reverse(grid)[i + 1][j] == grid[i + 1][N - 1 - j];
-
-        assert exists ii, jj {:trigger grid[ii][jj], grid[ii + 1][jj]} ::
-            ii == i &&
-            jj == N - 1 - j &&
-            0 <= ii < N - 1 &&
-            0 <= jj < N &&
-            grid[ii][jj] == grid[ii + 1][jj];
+        NoHorizontalThenVertical(Reverse(grid));
+        var i, j := ExistsVerticalPair(Reverse(grid));
+        VerticalPairReverseBack(grid, i, j);
+        assert exists ii, jj :: VerticalPair(ii, jj, grid);
       }
     }
   }
@@ -225,40 +220,31 @@ module Transform {
   lemma ExistsVerticalMerge(grid: Grid) returns (i: int, j: int)
     requires ValidGrid(grid)
     requires ValidValues(grid)
-    requires exists i, j ::
-               twotilesadjacent(i, j, grid)
-    ensures 0 <= i < N - 1
-    ensures 0 <= j < N
-    ensures grid[i][j] == grid[i + 1][j]
+    requires exists i, j :: twotilesadjacent(i, j, grid)
+    ensures VerticalPair(i, j, grid)
   {
-    // var i1, j1 :| 0 <= i1 < N - 1 && 0 <= j1 < N && grid[i1][j1] == grid[i1 + 1][j1];
-    var i1,j1:| twotilesadjacent(i1, j1, grid);
+    var i1, j1 :| twotilesadjacent(i1, j1, grid);
     i, j := i1, j1;
   }
 
   predicate twotilesadjacent(i: int, j: int, grid: Grid)
     requires ValidGrid(grid)
   {
-    0 <= i < N - 1 && 0 <= j < N &&
-    grid[i][j] == grid[i + 1][j]
+    VerticalPair(i, j, grid)
   }
 
   // two adjacent tiles with the same value in the same row
   predicate twotilesadjacentrow(i: int, j: int, grid: Grid)
     requires ValidGrid(grid)
   {
-    0 <= i < N && 0 <= j < N - 1 &&
-    grid[i][j] == grid[i][j + 1]
+    HorizontalPair(i, j, grid)
   }
 
   lemma ExistsHorizontalMerge(grid: Grid) returns (i: int, j: int)
     requires ValidGrid(grid)
     requires ValidValues(grid)
-    requires exists i, j ::
-               twotilesadjacentrow(i, j, grid)
-    ensures 0 <= i < N
-    ensures 0 <= j < N - 1
-    ensures grid[i][j] == grid[i][j + 1]
+    requires exists i, j :: twotilesadjacentrow(i, j, grid)
+    ensures HorizontalPair(i, j, grid)
   {
     var i1, j1 :| twotilesadjacentrow(i1, j1, grid);
     i, j := i1, j1;
@@ -380,6 +366,46 @@ module Transform {
     }
   }
 
+  lemma TransposeHorizontalPairToVertical(grid: Grid, i: int, j: int)
+    requires ValidGrid(grid)
+    requires ValidValues(grid)
+    requires HorizontalPair(i, j, grid)
+    ensures VerticalPair(j, i, Transpose(grid))
+  {
+    assert Transpose(grid)[j][i] == grid[i][j];
+    assert Transpose(grid)[j + 1][i] == grid[i][j + 1];
+  }
+
+  lemma TransposeVerticalPairToHorizontal(grid: Grid, i: int, j: int)
+    requires ValidGrid(grid)
+    requires ValidValues(grid)
+    requires VerticalPair(i, j, grid)
+    ensures HorizontalPair(j, i, Transpose(grid))
+  {
+    assert Transpose(grid)[j][i] == grid[i][j];
+    assert Transpose(grid)[j][i + 1] == grid[i + 1][j];
+  }
+
+  lemma TransposeHorizontalPairBack(grid: Grid, i: int, j: int)
+    requires ValidGrid(grid)
+    requires ValidValues(grid)
+    requires HorizontalPair(i, j, Transpose(grid))
+    ensures VerticalPair(j, i, grid)
+  {
+    assert Transpose(grid)[i][j] == grid[j][i];
+    assert Transpose(grid)[i][j + 1] == grid[j + 1][i];
+  }
+
+  lemma TransposeVerticalPairBack(grid: Grid, i: int, j: int)
+    requires ValidGrid(grid)
+    requires ValidValues(grid)
+    requires VerticalPair(i, j, Transpose(grid))
+    ensures HorizontalPair(j, i, grid)
+  {
+    assert Transpose(grid)[i][j] == grid[j][i];
+    assert Transpose(grid)[i + 1][j] == grid[j][i + 1];
+  }
+
   lemma TransposePreservesMoreToMerge(grid: Grid)
     requires ValidGrid(grid)
     requires ValidValues(grid)
@@ -387,77 +413,32 @@ module Transform {
   {
     // grid -> Transpose(grid)
     if MoreToMerge(grid) {
-      if exists i, j ::
-          0 <= i < N && 0 <= j < N - 1 &&
-          grid[i][j] == grid[i][j + 1]
-      {
-        var i, j :|
-          0 <= i < N && 0 <= j < N - 1 &&
-          grid[i][j] == grid[i][j + 1];
-
-        assert Transpose(grid)[j][i] == grid[i][j];
-        assert Transpose(grid)[j + 1][i] == grid[i][j + 1];
-
-        assert exists ii, jj {:trigger Transpose(grid)[ii][jj], Transpose(grid)[ii + 1][jj]} ::
-            ii == j &&
-            jj == i &&
-            0 <= ii < N - 1 &&
-            0 <= jj < N &&
-            Transpose(grid)[ii][jj] == Transpose(grid)[ii + 1][jj];
+      EnsuresMoreToMerge(grid);
+      if exists i, j :: HorizontalPair(i, j, grid) {
+        var i, j := ExistsHorizontalPair(grid);
+        TransposeHorizontalPairToVertical(grid, i, j);
+        assert exists ii, jj :: VerticalPair(ii, jj, Transpose(grid));
       } else {
-        assert exists i, j {:trigger grid[i][j], grid[i + 1][j]} ::
-            0 <= i < N - 1 && 0 <= j < N &&
-            grid[i][j] == grid[i + 1][j];
-
-        var i, j :| 0 <= i < N - 1 && 0 <= j < N && grid[i][j] == grid[i + 1][j];
-
-        assert Transpose(grid)[j][i] == grid[i][j];
-        assert Transpose(grid)[j][i + 1] == grid[i + 1][j];
-
-        assert exists ii, jj ::
-            ii == j &&
-            jj == i &&
-            0 <= ii < N &&
-            0 <= jj < N - 1 &&
-            Transpose(grid)[ii][jj] == Transpose(grid)[ii][jj + 1];
+        NoHorizontalThenVertical(grid);
+        var i, j := ExistsVerticalPair(grid);
+        TransposeVerticalPairToHorizontal(grid, i, j);
+        assert exists ii, jj :: HorizontalPair(ii, jj, Transpose(grid));
       }
     }
 
     // Transpose(grid) -> grid
     if MoreToMerge(Transpose(grid)) {
-      if exists i, j ::
-          0 <= i < N && 0 <= j < N - 1 &&
-          Transpose(grid)[i][j] == Transpose(grid)[i][j + 1]
-      {
-        var i, j :|
-          0 <= i < N && 0 <= j < N - 1 &&
-          Transpose(grid)[i][j] == Transpose(grid)[i][j + 1];
-
-        assert Transpose(grid)[i][j] == grid[j][i];
-        assert Transpose(grid)[i][j + 1] == grid[j + 1][i];
-
-        assert exists ii, jj {:trigger grid[ii][jj], grid[ii + 1][jj]} ::
-            ii == j &&
-            jj == i &&
-            0 <= ii < N - 1 &&
-            0 <= jj < N &&
-            grid[ii][jj] == grid[ii + 1][jj];
+      TransposePreservesValues(grid);
+      EnsuresMoreToMerge(Transpose(grid));
+      if exists i, j :: HorizontalPair(i, j, Transpose(grid)) {
+        var i, j := ExistsHorizontalPair(Transpose(grid));
+        TransposeHorizontalPairBack(grid, i, j);
+        assert exists ii, jj :: VerticalPair(ii, jj, grid);
       } else {
-        assert exists i, j {:trigger Transpose(grid)[i][j], Transpose(grid)[i + 1][j]} ::
-            0 <= i < N - 1 && 0 <= j < N &&
-            Transpose(grid)[i][j] == Transpose(grid)[i + 1][j];
-
-        var i, j :| 0 <= i < N - 1 && 0 <= j < N && Transpose(grid)[i][j] == Transpose(grid)[i + 1][j];
-
-        assert Transpose(grid)[i][j] == grid[j][i];
-        assert Transpose(grid)[i + 1][j] == grid[j][i + 1];
-
-        assert exists ii, jj ::
-            ii == j &&
-            jj == i &&
-            0 <= ii < N &&
-            0 <= jj < N - 1 &&
-            grid[ii][jj] == grid[ii][jj + 1];
+        NoHorizontalThenVertical(Transpose(grid));
+        var i, j := ExistsVerticalPair(Transpose(grid));
+        TransposeVerticalPairBack(grid, i, j);
+        assert exists ii, jj :: HorizontalPair(ii, jj, grid);
       }
     }
   }

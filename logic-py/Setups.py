@@ -67,11 +67,19 @@ class default__:
         return _dafny.quantifier(_dafny.IntegerRange(0, default__.N), False, lambda0_)
 
     @staticmethod
+    def HorizontalPair(i, j, grid):
+        return ((((0) <= (i)) and ((i) < (default__.N))) and (((0) <= (j)) and ((j) < ((default__.N) - (1))))) and ((((grid)[i])[j]) == (((grid)[i])[(j) + (1)]))
+
+    @staticmethod
+    def VerticalPair(i, j, grid):
+        return ((((0) <= (i)) and ((i) < ((default__.N) - (1)))) and (((0) <= (j)) and ((j) < (default__.N)))) and ((((grid)[i])[j]) == (((grid)[(i) + (1)])[j]))
+
+    @staticmethod
     def MoreToMerge(grid):
         def lambda0_(exists_var_0_):
             def lambda1_(exists_var_1_):
                 d_1_j_: int = exists_var_1_
-                return ((((0) <= (d_0_i_)) and ((d_0_i_) < (default__.N))) and (((0) <= (d_1_j_)) and ((d_1_j_) < ((default__.N) - (1))))) and ((((grid)[d_0_i_])[d_1_j_]) == (((grid)[d_0_i_])[(d_1_j_) + (1)]))
+                return ((((0) <= (d_0_i_)) and ((d_0_i_) < (default__.N))) and (((0) <= (d_1_j_)) and ((d_1_j_) < ((default__.N) - (1))))) and (default__.HorizontalPair(d_0_i_, d_1_j_, grid))
 
             d_0_i_: int = exists_var_0_
             return _dafny.quantifier(_dafny.IntegerRange(0, (default__.N) - (1)), False, lambda1_)
@@ -79,7 +87,7 @@ class default__:
         def lambda2_(exists_var_2_):
             def lambda3_(exists_var_3_):
                 d_3_j_: int = exists_var_3_
-                return ((((0) <= (d_2_i_)) and ((d_2_i_) < ((default__.N) - (1)))) and (((0) <= (d_3_j_)) and ((d_3_j_) < (default__.N)))) and ((((grid)[d_2_i_])[d_3_j_]) == (((grid)[(d_2_i_) + (1)])[d_3_j_]))
+                return ((((0) <= (d_2_i_)) and ((d_2_i_) < ((default__.N) - (1)))) and (((0) <= (d_3_j_)) and ((d_3_j_) < (default__.N)))) and (default__.VerticalPair(d_2_i_, d_3_j_, grid))
 
             d_2_i_: int = exists_var_2_
             return _dafny.quantifier(_dafny.IntegerRange(0, default__.N), False, lambda3_)

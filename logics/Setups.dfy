@@ -52,14 +52,27 @@ module Setups {
     }
 
     // Predicate 3: has more room to merge  =>  can continue
+    predicate HorizontalPair(i: int, j: int, grid: Grid)
+        requires ValidGrid(grid)
+    {
+        0 <= i < N && 0 <= j < N - 1 &&
+        grid[i][j] == grid[i][j + 1]
+    }
+
+    predicate VerticalPair(i: int, j: int, grid: Grid)
+        requires ValidGrid(grid)
+    {
+        0 <= i < N - 1 && 0 <= j < N &&
+        grid[i][j] == grid[i + 1][j]
+    }
+
+    // Predicate 3: has more room to merge  =>  can continue
     predicate MoreToMerge(grid: Grid)
         requires ValidGrid(grid)
         requires ValidValues(grid)
     {
-        // rows
-        (exists i, j :: 0 <= i < N && 0 <= j < N - 1 && grid[i][j] == grid[i][j+1]) ||
-        // columns
-        (exists i, j {:trigger grid[i][j]} :: 0 <= i < N - 1 && 0 <= j < N && grid[i][j] == grid[i+1][j])
+        (exists i, j | 0 <= i < N && 0 <= j < N - 1 :: HorizontalPair(i, j, grid)) ||
+        (exists i, j | 0 <= i < N - 1 && 0 <= j < N :: VerticalPair(i, j, grid))
     }
 
     // Predicate 4: State indicates lose
