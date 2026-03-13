@@ -66,7 +66,6 @@ module Setups {
         grid[i][j] == grid[i + 1][j]
     }
 
-    // Predicate 3: has more room to merge  =>  can continue
     predicate MoreToMerge(grid: Grid)
         requires ValidGrid(grid)
         requires ValidValues(grid)

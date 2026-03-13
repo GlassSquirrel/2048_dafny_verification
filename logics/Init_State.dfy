@@ -107,6 +107,9 @@ module Init {
             {
                 if grid[i][j] == grid[i][j+1] 
                 { 
+                    assert HorizontalPair(i, j, grid);
+                    assert exists ii, jj :: 0 <= ii < N && 0 <= jj < N - 1 && grid[ii][jj] == grid[ii][jj+1];
+                    assert MoreToMerge(grid);
                     return NotOver; 
                 }
                 j := j + 1;
@@ -132,6 +135,9 @@ module Init {
             {
                 if grid[i][j] == grid[i+1][j] 
                 { 
+                    assert VerticalPair(i, j, grid);
+                    assert exists ii, jj | 0 <= ii < N - 1 && 0 <= jj < N :: VerticalPair(ii, jj, grid);
+                    assert MoreToMerge(grid);
                     return NotOver; 
                 }
                 j := j + 1;

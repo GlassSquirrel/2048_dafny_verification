@@ -46,7 +46,7 @@ Verified conditions:
 ### 6. Random Tile Generation
 After a successful move:
 A new tile 2 is generated at a random empty position.
-Dafny verifies the correctness of the new board via `NewTileValidation(old_board, moved, new_board)`
+Dafny verifies the correctness of the new board via `initial_grid_validation(grid` and `new_tile_validation(oldGrid, changed, newGrid)`.
 
 ## System Requirements
 Python 3.9+
@@ -108,6 +108,8 @@ User presses a key
 Python GUI calls Dafny directional control
         ↓
 Dafny returns (new_board, done)
+        ↓
+Game state checked (Win / Lose / NotOver)
         ↓
 If done:
     Python randomly generates a new tile
