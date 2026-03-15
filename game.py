@@ -181,15 +181,15 @@ class GameGrid(Frame):
         if "Win" in state_str:
             self.matrix = moved_board
             self.update_grid_cells()
-            self.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg=c.CELL_COLOR_DICT[2])
-            self.grid_cells[1][2].configure(text="Win!", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg=c.CELL_COLOR_DICT[2])
+            self.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg="#f9f6f2")
+            self.grid_cells[1][2].configure(text="Win!", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg="#f9f6f2")
             return
         # if Lose => lose
         if "Lose" in state_str:
             self.matrix = moved_board
             self.update_grid_cells()
-            self.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg=c.CELL_COLOR_DICT[2])
-            self.grid_cells[1][2].configure(text="Lose!", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg=c.CELL_COLOR_DICT[2])
+            self.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg="#f9f6f2")
+            self.grid_cells[1][2].configure(text="Lose!", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg="#f9f6f2")
             return
         # if NotOver => random generate new tile
         spawned_board_py = spawn_random_two(moved_board)
@@ -210,11 +210,11 @@ class GameGrid(Frame):
         final_state_str = str(final_state)
         # if Lose => lose
         if "Win" in final_state_str:
-            self.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg=c.CELL_COLOR_DICT[2])
-            self.grid_cells[1][2].configure(text="Win!", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg=c.CELL_COLOR_DICT[2])
+            self.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg="#f9f6f2")
+            self.grid_cells[1][2].configure(text="Win!", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg="#f9f6f2")
         # else: next input
         elif "Lose" in final_state_str:
-            self.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg=c.CELL_COLOR_DICT[2])
-            self.grid_cells[1][2].configure(text="Lose!", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg=c.CELL_COLOR_DICT[2])
+            self.grid_cells[1][1].configure(text="You", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg="#f9f6f2")
+            self.grid_cells[1][2].configure(text="Lose!", bg=c.BACKGROUND_COLOR_CELL_EMPTY, fg="#f9f6f2")
 
 game_grid = GameGrid()
