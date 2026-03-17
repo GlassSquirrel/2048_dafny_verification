@@ -46,7 +46,7 @@ Verified conditions:
 ### 6. Random Tile Generation
 After a successful move:
 A new tile 2 is generated at a random empty position.
-Dafny verifies the correctness of the new board via `initial_grid_validation(grid` and `new_tile_validation(oldGrid, changed, newGrid)`.
+Dafny verifies the correctness of the new board via `initial_grid_validation(grid)` and `new_tile_validation(oldGrid, changed, newGrid)`.
 
 ## System Requirements
 Python 3.9+
@@ -60,6 +60,27 @@ sudo apt install python3-tk
 ```
 
 ## Build Game Logic
+### Verifying the Dafny Files
+The verified logic is organized into multiple Dafny files under the `logics/` directory.
+
+To verify one Dafny file at a time, first enter the logic folder and run:
+```
+cd logics
+dafny verify Setups.dfy
+```
+You can replace Move.dfy with any other file name, such as `Init_State.dfy`, `Move.dfy`, `Merge.dfy`, `Transform.dfy`, `Directions.dfy`:
+
+To verify the whole project at once from the project root, run:
+```
+dafny verify --verify-included-files logic.dfy
+```
+
+Note: some files may take noticeably longer to verify, especially Move.dfy. Verifying the entire project together may also take longer than verifying files individually.
+If verification times out, you can increase Dafny's time limit, for example:
+```
+dafny verify --verification-time-limit:60 Move.dfy
+```
+
 ### Compile Dafny code
 Compile the Dafny logic into Python code:
 ```
