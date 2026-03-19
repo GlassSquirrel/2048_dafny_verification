@@ -68,7 +68,7 @@ To verify one Dafny file at a time, first enter the logic folder and run:
 cd logics
 dafny verify Setups.dfy
 ```
-You can replace Move.dfy with any other file name, such as `Init_State.dfy`, `Move.dfy`, `Merge.dfy`, `Transform.dfy`, `Directions.dfy`:
+You can replace `Setups.dfy` with any other file name, such as `Init_State.dfy`, `Move.dfy`, `Merge.dfy`, `Transform.dfy`, `Directions.dfy`:
 
 To verify the whole project at once from the project root, run:
 ```
